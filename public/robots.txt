@@ -1,0 +1,33 @@
+User-agent: *
+Allow: /
+
+# Allow all SEO pages
+Allow: /bathrooms-in/
+Allow: /bathrooms-near/
+Allow: /properties-in/
+Allow: /properties-near/
+
+# Allow provider landing pages
+Allow: /rent-your-bathroom
+Allow: /bathroom-rental-income
+Allow: /accessible-bathroom-provider
+Allow: /private-restroom-sharing
+Allow: /earn-money-bathroom
+
+# Block admin and private areas
+Disallow: /admin/
+Disallow: /manage/
+Disallow: /dev-provider-routes
+Disallow: /profile/
+Disallow: /bookings/
+Disallow: /messages/
+Disallow: /api/
+
+# Block auth pages
+Disallow: /login
+Disallow: /register
+Disallow: /reset-password
+Disallow: /forgot-password
+
+# Sitemap location
+Sitemap: https://watercloset.app/sitemap.xml

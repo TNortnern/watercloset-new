@@ -36,7 +36,8 @@ const infoWindow = ref<google.maps.InfoWindow | null>(null)
 let boundsChangeDebounce: ReturnType<typeof setTimeout> | null = null
 let isInitialLoad = true
 
-const GOOGLE_MAPS_API_KEY = 'AIzaSyCgnlL9xiNWE3tR75EfrL0QrJaL7koqeKA'
+const config = useRuntimeConfig()
+const GOOGLE_MAPS_API_KEY = config.public.googleMapsApiKey
 
 // Load Google Maps script
 const loadGoogleMaps = (): Promise<void> => {

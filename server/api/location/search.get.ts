@@ -4,8 +4,15 @@
 export default defineEventHandler(async (event) => {
   const query = getQuery<{ text?: string, latitude?: string, longitude?: string, q?: string }>(event)
 
-  // Use environment variable for API key, with fallback
-  const apiKey = process.env.GOOGLE_MAPS_API_KEY || 'AIzaSyCgnlL9xiNWE3tR75EfrL0QrJaL7koqeKA'
+  // Use environment variable for API key
+  const apiKey = process.env.GOOGLE_MAPS_API_KEY || ''
+
+  if (!apiKey) {
+    throw createError({
+      statusCode: 500,
+      statusMessage: 'Google Maps API key not configured',
+    })
+  }
   const baseUrl = 'https://maps.googleapis.com/maps/api/geocode/json'
 
   // Support both 'text' and 'q' as query parameter names

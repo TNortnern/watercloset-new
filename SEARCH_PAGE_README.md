@@ -125,11 +125,12 @@ API Key is configured in `/apps/api/.env` as `GEOAPIFY_API_KEY`
 ### Environment Variables
 ```env
 # In apps/api/.env
-GEOAPIFY_API_KEY=a2d082683a4d4290b5879815f5388db9
+GEOAPIFY_API_KEY=your-geoapify-api-key
 PAYLOAD_PUBLIC_SERVER_URL=http://localhost:3001
 
-# In nuxt.config.ts (auto-configured)
-NUXT_PUBLIC_GEOAPIFY_KEY=a2d082683a4d4290b5879815f5388db9
+# In .env (root)
+NUXT_PUBLIC_GEOAPIFY_KEY=your-geoapify-api-key
+NUXT_PUBLIC_GOOGLE_MAPS_API_KEY=your-google-maps-api-key
 ```
 
 ### Nuxt Config Changes

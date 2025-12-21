@@ -66,13 +66,17 @@ import DashboardMobileNav from '@/components/dashboard/MobileNav.vue'
 const sidebarOpen = ref(false)
 const sidebarCollapsed = ref(false)
 
-// Mock admin user - replace with real auth
-const user = {
-  name: 'Admin User',
-  email: 'admin@mywatercloset.com',
-  initials: 'AD',
-  role: 'admin' as const
-}
+// Get real user from auth
+const { user: authUser, userInitials, displayName, logout } = useAuth()
+
+// Format user for Header/Sidebar components
+const user = computed(() => ({
+  name: displayName.value,
+  email: authUser.value?.email || '',
+  initials: userInitials.value,
+  role: authUser.value?.role || 'admin',
+  avatar: authUser.value?.avatar?.url
+}))
 
 // Admin dashboard navigation
 const navigationItems = [
@@ -93,7 +97,7 @@ const mobileNavigationItems = computed(() => {
   )
 })
 
-const handleLogout = () => {
-  navigateTo('/login')
+const handleLogout = async () => {
+  await logout()
 }
 </script>

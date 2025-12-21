@@ -61,32 +61,42 @@ import DashboardMobileNav from '@/components/dashboard/MobileNav.vue'
 const sidebarOpen = ref(false)
 const sidebarCollapsed = ref(false)
 
-// Mock user - replace with real auth
-const user = {
-  name: 'Sarah Johnson',
-  email: 'sarah@example.com',
-  initials: 'SJ',
-  role: 'user' as const
-}
+// Get real user from auth
+const { user: authUser, userInitials, displayName, logout } = useAuth()
 
-// User dashboard navigation
-const navigationItems = [
+// Format user for Header/Sidebar components
+const user = computed(() => ({
+  name: displayName.value,
+  email: authUser.value?.email || '',
+  initials: userInitials.value,
+  role: authUser.value?.role || 'user',
+  avatar: authUser.value?.avatar?.url
+}))
+
+// Count favorites from user data
+const favoritesCount = computed(() => {
+  if (!authUser.value?.favorites) return 0
+  return Array.isArray(authUser.value.favorites) ? authUser.value.favorites.length : 0
+})
+
+// User dashboard navigation - badges computed from real data
+const navigationItems = computed(() => [
   { name: 'Dashboard', href: '/dashboard', icon: Home },
-  { name: 'My Bookings', href: '/dashboard/bookings', icon: Calendar, badge: 3 },
-  { name: 'Favorites', href: '/dashboard/favorites', icon: Heart, badge: 8 },
+  { name: 'My Bookings', href: '/dashboard/bookings', icon: Calendar },
+  { name: 'Favorites', href: '/dashboard/favorites', icon: Heart, badge: favoritesCount.value || undefined },
   { name: 'Find Bathroom', href: '/search', icon: MapPin },
   { name: 'Profile', href: '/dashboard/profile', icon: User },
   { name: 'Settings', href: '/dashboard/settings', icon: Settings },
-]
+])
 
 // Mobile navigation shows only main items
 const mobileNavigationItems = computed(() => {
-  return navigationItems.filter(item =>
+  return navigationItems.value.filter(item =>
     ['Dashboard', 'My Bookings', 'Favorites', 'Find Bathroom'].includes(item.name)
   )
 })
 
-const handleLogout = () => {
-  navigateTo('/login')
+const handleLogout = async () => {
+  await logout()
 }
 </script>

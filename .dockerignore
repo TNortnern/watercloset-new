@@ -1,0 +1,11 @@
+.git
+.gitignore
+.DS_Store
+.nuxt
+.output
+.turbo
+node_modules
+**/node_modules
+apps/api/.next
+apps/api/node_modules
+apps/api/uploads

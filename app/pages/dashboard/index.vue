@@ -3,7 +3,7 @@
     <!-- Welcome Header -->
     <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
       <div>
-        <h1 class="text-3xl font-bold text-slate-900">Welcome back, {{ user.name }}!</h1>
+        <h1 class="text-3xl font-bold text-slate-900">Welcome back, {{ user?.firstName || 'there' }}!</h1>
         <p class="mt-1 text-slate-600">Here's what's happening with your bookings today.</p>
       </div>
       <div class="flex gap-3">
@@ -146,6 +146,54 @@
           </CardContent>
         </Card>
 
+        <!-- My Reviews -->
+        <Card class="mt-6">
+          <CardHeader class="border-b border-slate-200">
+            <div class="flex items-center justify-between">
+              <CardTitle class="text-xl">My Reviews</CardTitle>
+              <Button variant="ghost" size="sm" @click="navigateTo('/dashboard/bookings?tab=past')">
+                View All
+                <ChevronRight class="w-4 h-4 ml-1" />
+              </Button>
+            </div>
+          </CardHeader>
+          <CardContent class="p-6">
+            <div v-if="userReviewsData?.docs && userReviewsData.docs.length > 0" class="space-y-4">
+              <div
+                v-for="review in userReviewsData.docs.slice(0, 3)"
+                :key="review.id"
+                class="p-4 border border-slate-200 rounded-lg hover:border-blue-300 hover:shadow-sm transition-all"
+              >
+                <div class="flex items-start justify-between gap-4">
+                  <div class="flex-1 min-w-0">
+                    <div class="flex items-center gap-2 mb-2">
+                      <h4 class="font-semibold text-slate-900">{{ review.property?.name || 'Unknown Property' }}</h4>
+                      <div class="flex items-center gap-1">
+                        <Star class="w-4 h-4 text-yellow-400 fill-yellow-400" />
+                        <span class="font-semibold text-sm">{{ review.rating }}</span>
+                      </div>
+                    </div>
+                    <p class="text-sm text-slate-700 line-clamp-2">{{ review.comment }}</p>
+                    <div class="flex items-center gap-4 mt-2 text-xs text-slate-500">
+                      <span>{{ new Date(review.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) }}</span>
+                      <div v-if="review.cleanliness || review.accuracy || review.communication" class="flex gap-3">
+                        <span v-if="review.cleanliness">Clean: {{ review.cleanliness }}/5</span>
+                        <span v-if="review.accuracy">Accurate: {{ review.accuracy }}/5</span>
+                        <span v-if="review.communication">Communication: {{ review.communication }}/5</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div v-else class="text-center py-8">
+              <Star class="w-12 h-12 mx-auto text-slate-300" />
+              <p class="mt-2 text-slate-600">No reviews yet</p>
+              <p class="text-sm text-slate-500 mt-1">Complete a booking to leave your first review</p>
+            </div>
+          </CardContent>
+        </Card>
+
         <!-- Recently Viewed -->
         <Card class="mt-6">
           <CardHeader class="border-b border-slate-200">
@@ -280,7 +328,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
+import { computed, ref, onMounted } from 'vue'
 import { Calendar, MessageSquare, Star, MapPin, Clock, ChevronRight, Search, Heart, Settings, DollarSign } from 'lucide-vue-next'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -289,126 +337,159 @@ definePageMeta({
   layout: 'dashboard-user',
 })
 
-// Mock user data
-const user = ref({
-  name: 'Sarah Johnson',
-  email: 'sarah.j@example.com',
+const { user } = useAuth()
+const payload = usePayload()
+
+// Client-side only data (localStorage)
+const favoritesCount = ref(0)
+const recentlyViewedItems = ref<any[]>([])
+
+onMounted(() => {
+  // Load favorites count from localStorage
+  try {
+    const favoritesStr = localStorage.getItem('favorites') || '[]'
+    favoritesCount.value = JSON.parse(favoritesStr).length
+  } catch {}
+
+  // Load recently viewed from localStorage
+  try {
+    const viewedStr = localStorage.getItem('recentlyViewed') || '[]'
+    recentlyViewedItems.value = JSON.parse(viewedStr).slice(0, 4)
+  } catch {}
 })
 
-// Mock stats
-const stats = ref({
-  totalBookings: 24,
-  favorites: 8,
-  upcomingBookings: 3,
-  reviewsGiven: 18,
+// Fetch user's bookings
+const { data: bookingsData, pending: bookingsPending } = await useAsyncData(
+  'dashboard-bookings',
+  async () => {
+    if (!user.value?.id) return null
+
+    const now = new Date().toISOString()
+
+    return await payload.find('bookings', {
+      where: {
+        user: { equals: user.value.id },
+      },
+      depth: 1,
+      sort: '-startTime',
+      limit: 100,
+    })
+  },
+  {
+    watch: [() => user.value?.id],
+  }
+)
+
+// Fetch user's reviews
+const { data: userReviewsData } = await useAsyncData(
+  'dashboard-reviews',
+  async () => {
+    if (!user.value?.id) return null
+
+    try {
+      return await payload.find('reviews', {
+        where: {
+          user: { equals: user.value.id },
+        },
+        depth: 2,
+        sort: '-createdAt',
+        limit: 100,
+      })
+    } catch (error) {
+      console.error('Error fetching reviews:', error)
+      return null
+    }
+  },
+  {
+    watch: [() => user.value?.id],
+  }
+)
+
+// Computed values from real data
+const allBookings = computed(() => bookingsData.value?.docs || [])
+
+const upcomingBookings = computed(() => {
+  const now = new Date()
+  return allBookings.value
+    .filter((b: any) => {
+      const startTime = new Date(b.startTime)
+      return startTime > now && b.status === 'confirmed'
+    })
+    .slice(0, 3)
+    .map((booking: any) => {
+      const property = booking.property
+      const startTime = new Date(booking.startTime)
+      const endTime = new Date(booking.endTime)
+
+      return {
+        id: booking.id,
+        name: property?.name || 'Unknown Property',
+        location: property?.address?.city && property?.address?.state
+          ? `${property.address.city}, ${property.address.state}`
+          : 'Location not available',
+        date: startTime.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
+        time: `${startTime.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })} - ${endTime.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}`,
+        price: booking.totalPrice,
+        status: 'Confirmed',
+        image: property?.images?.[0]?.url || 'https://images.unsplash.com/photo-1552321554-5fefe8c9ef14?w=400&h=300&fit=crop',
+      }
+    })
 })
 
-// Mock upcoming bookings (next 3)
-const upcomingBookings = ref([
-  {
-    id: 1,
-    name: 'Luxury Downtown Restroom',
-    location: 'Manhattan, NY',
-    date: 'Dec 18, 2025',
-    time: '2:00 PM - 2:30 PM',
-    price: 15,
-    status: 'Confirmed',
-    image: 'https://images.unsplash.com/photo-1552321554-5fefe8c9ef14?w=400&h=300&fit=crop',
-  },
-  {
-    id: 2,
-    name: 'Cozy Cafe Bathroom',
-    location: 'Brooklyn, NY',
-    date: 'Dec 20, 2025',
-    time: '10:00 AM - 10:30 AM',
-    price: 8,
-    status: 'Confirmed',
-    image: 'https://images.unsplash.com/photo-1584622650111-993a426fbf0a?w=400&h=300&fit=crop',
-  },
-  {
-    id: 3,
-    name: 'Modern Office Restroom',
-    location: 'Queens, NY',
-    date: 'Dec 22, 2025',
-    time: '4:00 PM - 4:30 PM',
-    price: 12,
-    status: 'Confirmed',
-    image: 'https://images.unsplash.com/photo-1620626011761-996317b8d101?w=400&h=300&fit=crop',
-  },
-])
+// Calculate stats from real bookings data
+const stats = computed(() => {
+  const now = new Date()
+  const sevenDaysFromNow = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000)
 
-// Mock recently viewed properties
-const recentlyViewed = ref([
-  {
-    id: 201,
-    name: 'Spa-Like Bathroom',
-    location: 'Manhattan, NY',
-    rating: 4.9,
-    price: 18,
-    image: 'https://images.unsplash.com/photo-1507652313519-d4e9174996dd?w=200&h=200&fit=crop',
-  },
-  {
-    id: 202,
-    name: 'Premium Hotel Facilities',
-    location: 'Manhattan, NY',
-    rating: 5.0,
-    price: 20,
-    image: 'https://images.unsplash.com/photo-1578683010236-d716f9a3f461?w=200&h=200&fit=crop',
-  },
-  {
-    id: 203,
-    name: 'Trendy Restaurant Restroom',
-    location: 'Brooklyn, NY',
-    rating: 4.5,
-    price: 10,
-    image: 'https://images.unsplash.com/photo-1556912167-f556f1f39faa?w=200&h=200&fit=crop',
-  },
-  {
-    id: 204,
-    name: 'Quiet Library Restroom',
-    location: 'Bronx, NY',
-    rating: 4.6,
-    price: 6,
-    image: 'https://images.unsplash.com/photo-1585412727339-54e4bae3bbf9?w=200&h=200&fit=crop',
-  },
-])
+  const upcoming = allBookings.value.filter((b: any) => {
+    const startTime = new Date(b.startTime)
+    return startTime > now && startTime <= sevenDaysFromNow && b.status === 'confirmed'
+  }).length
 
-// Mock recent activity
-const recentActivity = ref([
-  {
-    id: 1,
-    type: 'booking',
-    title: 'Booking confirmed for Luxury Downtown Restroom',
-    time: '2 hours ago',
-    icon: Calendar,
-  },
-  {
-    id: 2,
-    type: 'message',
-    title: 'New message from property owner',
-    time: '5 hours ago',
-    icon: MessageSquare,
-  },
-  {
-    id: 3,
-    type: 'review',
-    title: 'Your review was posted',
-    time: '1 day ago',
-    icon: Star,
-  },
-  {
-    id: 4,
-    type: 'payment',
-    title: 'Payment processed successfully',
-    time: '2 days ago',
-    icon: DollarSign,
-  },
-  {
-    id: 5,
-    type: 'booking',
-    title: 'Booking completed at Cozy Cafe',
-    time: '3 days ago',
-    icon: Calendar,
-  },
-])
+  // Get reviews count
+  const reviewsCount = userReviewsData.value?.docs?.length || 0
+
+  return {
+    totalBookings: allBookings.value.length,
+    favorites: favoritesCount.value,
+    upcomingBookings: upcoming,
+    reviewsGiven: reviewsCount,
+  }
+})
+
+// Recently viewed (loaded from localStorage on mount)
+const recentlyViewed = computed(() => recentlyViewedItems.value)
+
+// Recent activity based on bookings
+const recentActivity = computed(() => {
+  const activities: any[] = []
+
+  // Add recent bookings
+  allBookings.value.slice(0, 5).forEach((booking: any) => {
+    const startTime = new Date(booking.startTime)
+    const now = new Date()
+    const diffMs = now.getTime() - new Date(booking.createdAt).getTime()
+    const diffHours = Math.floor(diffMs / (1000 * 60 * 60))
+    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24))
+
+    let timeStr = ''
+    if (diffHours < 1) timeStr = 'Just now'
+    else if (diffHours < 24) timeStr = `${diffHours} hour${diffHours > 1 ? 's' : ''} ago`
+    else timeStr = `${diffDays} day${diffDays > 1 ? 's' : ''} ago`
+
+    activities.push({
+      id: booking.id,
+      type: 'booking',
+      title: booking.status === 'confirmed'
+        ? `Booking confirmed for ${booking.property?.name || 'a property'}`
+        : booking.status === 'completed'
+        ? `Booking completed at ${booking.property?.name || 'a property'}`
+        : `Booking ${booking.status}`,
+      time: timeStr,
+      icon: Calendar,
+    })
+  })
+
+  return activities
+})
 </script>

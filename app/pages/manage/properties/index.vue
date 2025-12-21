@@ -15,119 +15,133 @@ import {
 
 definePageMeta({
   layout: 'dashboard-provider',
+  middleware: 'provider'
 })
+
+const auth = useAuth()
+const payload = usePayload()
+const { toast } = useToast()
+const { confirm } = useConfirm()
+
+interface Property {
+  id: string
+  name: string
+  location: {
+    address: string
+    city: string
+    state: string
+    zipCode: string
+  }
+  pricePerMinute: number
+  photos?: { image: { url: string } }[]
+  status: string
+  amenities: string[]
+}
+
+interface Booking {
+  id: string
+  property: { id: string }
+  status: string
+}
+
+interface Review {
+  id: string
+  property: { id: string }
+  rating: number
+}
 
 const searchQuery = ref('')
 const selectedStatus = ref('all')
 
-const statusOptions = [
-  { value: 'all', label: 'All Properties', count: 8 },
-  { value: 'active', label: 'Active', count: 5 },
-  { value: 'inactive', label: 'Inactive', count: 2 },
-  { value: 'draft', label: 'Draft', count: 1 }
-]
+// Fetch provider's properties
+const { data: propertiesData, refresh: refreshProperties } = await useAsyncData('properties-list', async () => {
+  if (!auth.user.value?.id) return null
+  return await payload.find<Property>('properties', {
+    where: { owner: { equals: auth.user.value.id } },
+    depth: 1,
+    limit: 100
+  })
+})
 
-const properties = [
-  {
-    id: 1,
-    image: 'https://images.unsplash.com/photo-1552321554-5fefe8c9ef14?w=800&h=600&fit=crop',
-    title: 'Downtown Luxury Suite',
-    address: '123 Main Street, New York, NY',
-    price: 1.50,
-    rating: 4.9,
-    reviews: 42,
-    bookings: 28,
-    status: 'active',
-    amenities: ['WiFi', 'Shower', 'Toiletries']
-  },
-  {
-    id: 2,
-    image: 'https://images.unsplash.com/photo-1620626011761-996317b8d101?w=800&h=600&fit=crop',
-    title: 'Spa Retreat Bathroom',
-    address: '456 Park Avenue, Manhattan, NY',
-    price: 1.50,
-    rating: 4.8,
-    reviews: 35,
-    bookings: 22,
-    status: 'active',
-    amenities: ['Bathtub', 'Spa Products', 'Towels']
-  },
-  {
-    id: 3,
-    image: 'https://images.unsplash.com/photo-1564540583246-934409427776?w=800&h=600&fit=crop',
-    title: 'Modern Minimalist Washroom',
-    address: '789 Broadway, Brooklyn, NY',
-    price: 1.50,
-    rating: 4.7,
-    reviews: 28,
-    bookings: 19,
-    status: 'active',
-    amenities: ['Minimalist Design', 'Premium Soap', 'Mirror']
-  },
-  {
-    id: 4,
-    image: 'https://images.unsplash.com/photo-1507652313519-d4e9174996dd?w=800&h=600&fit=crop',
-    title: 'Executive Suite Bath',
-    address: '321 Wall Street, Financial District, NY',
-    price: 1.75,
-    rating: 5.0,
-    reviews: 18,
-    bookings: 15,
-    status: 'active',
-    amenities: ['Executive Lounge', 'Premium Amenities', 'Privacy']
-  },
-  {
-    id: 5,
-    image: 'https://images.unsplash.com/photo-1584622650111-993a426fbf0a?w=800&h=600&fit=crop',
-    title: 'Garden View Powder Room',
-    address: '654 Garden Street, Queens, NY',
-    price: 1.25,
-    rating: 4.6,
-    reviews: 24,
-    bookings: 18,
-    status: 'active',
-    amenities: ['Garden View', 'Natural Light', 'Fresh Towels']
-  },
-  {
-    id: 6,
-    image: 'https://images.unsplash.com/photo-1604709177225-055f99402ea3?w=800&h=600&fit=crop',
-    title: 'Vintage Charm Restroom',
-    address: '987 Heritage Lane, Brooklyn, NY',
-    price: 1.30,
-    rating: 4.5,
-    reviews: 16,
-    bookings: 12,
-    status: 'inactive',
-    amenities: ['Vintage Decor', 'Clawfoot Tub', 'Period Features']
-  },
-  {
-    id: 7,
-    image: 'https://images.unsplash.com/photo-1631889993959-41b4e9c6e3c5?w=800&h=600&fit=crop',
-    title: 'Penthouse Premium Bath',
-    address: '111 Skyline Drive, Manhattan, NY',
-    price: 2.00,
-    rating: 4.9,
-    reviews: 31,
-    bookings: 25,
-    status: 'inactive',
-    amenities: ['City Views', 'Luxury Finishes', 'Rain Shower']
-  },
-  {
-    id: 8,
-    image: 'https://images.unsplash.com/photo-1620626011761-996317b8d101?w=800&h=600&fit=crop',
-    title: 'Eco-Friendly Washroom',
-    address: '222 Green Street, Brooklyn, NY',
-    price: 1.40,
-    rating: 0,
-    reviews: 0,
-    bookings: 0,
-    status: 'draft',
-    amenities: ['Eco Products', 'Water Efficient', 'Sustainable']
-  }
-]
+// Fetch all bookings for count
+const { data: bookingsData } = await useAsyncData('properties-bookings', async () => {
+  if (!auth.user.value?.id) return null
+  return await payload.find<Booking>('bookings', {
+    where: {
+      'property.owner': { equals: auth.user.value.id }
+    },
+    depth: 1,
+    limit: 1000
+  })
+})
 
+// Fetch all reviews
+const { data: reviewsData } = await useAsyncData('properties-reviews', async () => {
+  if (!auth.user.value?.id) return null
+  const propertyIds = propertiesData.value?.docs.map(p => p.id) || []
+  if (propertyIds.length === 0) return null
+
+  return await payload.find<Review>('reviews', {
+    where: {
+      property: { in: propertyIds }
+    },
+    depth: 1,
+    limit: 1000
+  })
+})
+
+const allProperties = computed(() => propertiesData.value?.docs || [])
+const allBookings = computed(() => bookingsData.value?.docs || [])
+const allReviews = computed(() => reviewsData.value?.docs || [])
+
+// Calculate status counts
+const statusOptions = computed(() => {
+  const all = allProperties.value.length
+  const active = allProperties.value.filter(p => p.status === 'active').length
+  const inactive = allProperties.value.filter(p => p.status === 'inactive').length
+  const draft = allProperties.value.filter(p => p.status === 'draft').length
+
+  return [
+    { value: 'all', label: 'All Properties', count: all },
+    { value: 'active', label: 'Active', count: active },
+    { value: 'inactive', label: 'Inactive', count: inactive },
+    { value: 'draft', label: 'Draft', count: draft }
+  ]
+})
+
+// Transform properties for display
+const properties = computed(() => {
+  return allProperties.value.map(property => {
+    const propertyReviews = allReviews.value.filter(r => r.property.id === property.id)
+    const avgRating = propertyReviews.length > 0
+      ? propertyReviews.reduce((sum, r) => sum + r.rating, 0) / propertyReviews.length
+      : 0
+
+    const propertyBookings = allBookings.value.filter(b =>
+      typeof b.property === 'object' && b.property.id === property.id
+    )
+
+    const location = property.location
+    const addressStr = `${location.address}, ${location.city}, ${location.state}`
+
+    return {
+      id: property.id,
+      image: property.photos?.[0]?.image?.url || 'https://images.unsplash.com/photo-1552321554-5fefe8c9ef14?w=800&h=600&fit=crop',
+      title: property.name,
+      address: addressStr,
+      price: (property.pricePerMinute / 100).toFixed(2), // Convert from cents to dollars
+      rating: avgRating,
+      reviews: propertyReviews.length,
+      bookings: propertyBookings.length,
+      status: property.status,
+      amenities: property.amenities || []
+    }
+  })
+})
+
+// Filter properties
 const filteredProperties = computed(() => {
-  let filtered = properties
+  let filtered = properties.value
 
   if (selectedStatus.value !== 'all') {
     filtered = filtered.filter(p => p.status === selectedStatus.value)
@@ -151,6 +165,26 @@ const getStatusBadge = (status: string) => {
     draft: 'bg-yellow-100 text-yellow-700'
   }
   return badges[status as keyof typeof badges]
+}
+
+const deleteProperty = async (propertyId: string) => {
+  const confirmed = await confirm({
+    title: 'Delete Property',
+    message: 'Are you sure you want to delete this property? This action cannot be undone.',
+    confirmText: 'Delete',
+    variant: 'destructive',
+  })
+
+  if (!confirmed) return
+
+  try {
+    await payload.remove('properties', propertyId)
+    await refreshProperties()
+    toast.success('Property deleted successfully')
+  } catch (error) {
+    console.error('Failed to delete property:', error)
+    toast.error('Failed to delete property. Please try again.')
+  }
 }
 </script>
 
@@ -292,7 +326,7 @@ const getStatusBadge = (status: string) => {
               >
                 <Edit class="w-5 h-5" />
               </NuxtLink>
-              <button class="p-2 text-gray-600 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors">
+              <button @click="deleteProperty(property.id)" class="p-2 text-gray-600 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors">
                 <Trash2 class="w-5 h-5" />
               </button>
             </div>

@@ -126,7 +126,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, computed, watch, onMounted } from 'vue'
 import {
   Heart,
   Search,
@@ -143,108 +143,132 @@ definePageMeta({
   layout: 'dashboard-user',
 })
 
-// Mock favorites data
-const favorites = ref([
-  {
-    id: 201,
-    name: 'Spa-Like Bathroom',
-    location: 'Manhattan, NY',
-    rating: 4.9,
-    reviews: 142,
-    price: 18,
-    amenities: ['Premium Toiletries', 'Heated Floors', 'Towel Warmer', 'Aromatherapy'],
-    image: 'https://images.unsplash.com/photo-1507652313519-d4e9174996dd?w=600&h=400&fit=crop',
-  },
-  {
-    id: 202,
-    name: 'Premium Hotel Facilities',
-    location: 'Manhattan, NY',
-    rating: 5.0,
-    reviews: 203,
-    price: 20,
-    amenities: ['Luxury Fixtures', 'Marble Counters', 'Rain Shower', 'Bidet'],
-    image: 'https://images.unsplash.com/photo-1578683010236-d716f9a3f461?w=600&h=400&fit=crop',
-  },
-  {
-    id: 203,
-    name: 'Modern Office Restroom',
-    location: 'Queens, NY',
-    rating: 4.8,
-    reviews: 156,
-    price: 12,
-    amenities: ['Clean & Modern', 'Well-lit', 'Wheelchair Accessible', 'Baby Changing'],
-    image: 'https://images.unsplash.com/photo-1620626011761-996317b8d101?w=600&h=400&fit=crop',
-  },
-  {
-    id: 204,
-    name: 'Cozy Cafe Bathroom',
-    location: 'Brooklyn, NY',
-    rating: 4.7,
-    reviews: 89,
-    price: 8,
-    amenities: ['Artistic Decor', 'Plants', 'Natural Light', 'Music'],
-    image: 'https://images.unsplash.com/photo-1584622650111-993a426fbf0a?w=600&h=400&fit=crop',
-  },
-  {
-    id: 205,
-    name: 'Luxury Downtown Restroom',
-    location: 'Manhattan, NY',
-    rating: 4.9,
-    reviews: 127,
-    price: 15,
-    amenities: ['Smart Controls', 'Ambient Lighting', 'Designer Fixtures', 'Air Purifier'],
-    image: 'https://images.unsplash.com/photo-1552321554-5fefe8c9ef14?w=600&h=400&fit=crop',
-  },
-  {
-    id: 206,
-    name: 'Trendy Restaurant Restroom',
-    location: 'Brooklyn, NY',
-    rating: 4.5,
-    reviews: 91,
-    price: 10,
-    amenities: ['Instagram-worthy', 'Unique Design', 'Fresh Flowers', 'Signature Scent'],
-    image: 'https://images.unsplash.com/photo-1556912167-f556f1f39faa?w=600&h=400&fit=crop',
-  },
-  {
-    id: 207,
-    name: 'Elegant Boutique Restroom',
-    location: 'Manhattan, NY',
-    rating: 4.7,
-    reviews: 98,
-    price: 14,
-    amenities: ['Boutique Style', 'Plush Towels', 'Vanity Area', 'High-end Products'],
-    image: 'https://images.unsplash.com/photo-1600566752355-35792bedcfea?w=600&h=400&fit=crop',
-  },
-  {
-    id: 208,
-    name: 'Quiet Library Restroom',
-    location: 'Bronx, NY',
-    rating: 4.6,
-    reviews: 74,
-    price: 6,
-    amenities: ['Peaceful', 'Well-maintained', 'Reading Material', 'Climate Control'],
-    image: 'https://images.unsplash.com/photo-1585412727339-54e4bae3bbf9?w=600&h=400&fit=crop',
-  },
-])
+const { findByID, update } = usePayload()
+const { user } = useAuth()
+const { toast } = useToast()
+const { confirm } = useConfirm()
 
-// Actions
-const removeFavorite = (id: number) => {
-  console.log('Remove from favorites:', id)
-  // TODO: Implement remove from favorites functionality
-  if (confirm('Remove this property from your favorites?')) {
-    const index = favorites.value.findIndex(f => f.id === id)
-    if (index !== -1) {
-      favorites.value.splice(index, 1)
-    }
+const favoritesData = ref<any[]>([])
+const loading = ref(true)
+
+// Get favorite IDs from user object (stored in database)
+const favoriteIds = computed(() => {
+  if (!user.value?.favorites) return []
+  return (user.value.favorites || []).map((fav: number | string | { id: number | string }) => {
+    const id = typeof fav === 'object' ? fav.id : fav
+    return typeof id === 'number' ? id : parseInt(String(id), 10)
+  })
+})
+
+// Load property data for favorite IDs - fetch each one individually
+const loadFavoriteProperties = async () => {
+  if (favoriteIds.value.length === 0) {
+    favoritesData.value = []
+    loading.value = false
+    return
+  }
+
+  try {
+    // Fetch each favorite property individually
+    const properties = await Promise.all(
+      favoriteIds.value.map(async (id) => {
+        try {
+          return await findByID('properties', String(id), 1)
+        } catch (e) {
+          console.error(`Failed to load property ${id}:`, e)
+          return null
+        }
+      })
+    )
+
+    // Filter out any nulls from failed fetches
+    favoritesData.value = properties.filter(p => p !== null)
+  } catch (error) {
+    console.error('Failed to load favorite properties:', error)
+    favoritesData.value = []
+  } finally {
+    loading.value = false
   }
 }
 
-const bookNow = (id: number) => {
-  // Since individual property pages don't exist yet, go to search page
-  navigateTo('/search')
+// Load property data when user favorites change
+onMounted(() => {
+  watch(favoriteIds, async () => {
+    await loadFavoriteProperties()
+  }, { immediate: true })
+})
+
+// Transform favorites for display
+const favorites = computed(() => {
+  return favoritesData.value.map((property: any) => {
+    const loc = property.location
+    return {
+      id: property.id,
+      name: property.name || 'Unnamed Property',
+      location: loc?.city && loc?.state
+        ? `${loc.city}, ${loc.state}`
+        : 'Location not available',
+      rating: property.stats?.averageRating || 0,
+      reviews: property.stats?.reviewCount || 0,
+      price: (property.pricePerMinute / 100).toFixed(2) || '0.00',
+      amenities: property.amenities || [],
+      image: property.photos?.[0]?.image?.url || property.photos?.[0]?.image || 'https://images.unsplash.com/photo-1552321554-5fefe8c9ef14?w=600&h=400&fit=crop',
+    }
+  })
+})
+
+// Actions
+const removeFavorite = async (id: string) => {
+  const confirmed = await confirm({
+    title: 'Remove Favorite',
+    message: 'Remove this property from your favorites?',
+    confirmText: 'Remove',
+    cancelText: 'Cancel',
+    variant: 'destructive',
+  })
+
+  if (!confirmed) return
+  if (!user.value?.id) return
+
+  const numericId = parseInt(id, 10)
+  const newFavorites = favoriteIds.value.filter(fid => fid !== numericId)
+
+  try {
+    await update('users', user.value.id, {
+      favorites: newFavorites,
+    })
+
+    // Update local user state
+    user.value = {
+      ...user.value,
+      favorites: newFavorites,
+    }
+
+    // Remove from displayed data
+    favoritesData.value = favoritesData.value.filter(f => f.id !== numericId && f.id !== id)
+    toast.success('Removed from favorites')
+  } catch (error) {
+    console.error('Failed to remove favorite:', error)
+    toast.error('Failed to remove from favorites. Please try again.')
+  }
 }
 
-const shareProperty = (id: number) => {
-  alert(`Share property #${id} functionality`)
+const bookNow = (id: string) => {
+  navigateTo(`/bathrooms/${id}`)
+}
+
+const shareProperty = async (id: string) => {
+  const url = `${window.location.origin}/bathrooms/${id}`
+
+  if (navigator.clipboard) {
+    try {
+      await navigator.clipboard.writeText(url)
+      toast.success('Property link copied to clipboard!')
+    } catch {
+      toast.info(`Share this property: ${url}`)
+    }
+  } else {
+    toast.info(`Share this property: ${url}`)
+  }
 }
 </script>

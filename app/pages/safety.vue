@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Shield, UserCheck, Eye, MessageSquare, AlertTriangle } from 'lucide-vue-next'
+import { Shield, UserCheck, Eye, MessageSquare, AlertTriangle, Star, Accessibility, Home, Lock } from 'lucide-vue-next'
 import { Button } from '@/components/ui/button'
 
 definePageMeta({
@@ -14,12 +14,12 @@ const safetyFeatures = [
   },
   {
     title: "Secure Payments",
-    description: "All transactions are processed securely. Money is held in escrow until the booking is successfully completed.",
+    description: "All transactions are processed securely through Stripe. Money is held in escrow until the booking is successfully completed.",
     icon: Shield
   },
   {
     title: "Community Reviews",
-    description: "Honest, transparent reviews from real users help keep our standards high and bad actors out.",
+    description: "Honest, transparent reviews from real users help keep our standards high and maintain accountability.",
     icon: Star
   },
   {
@@ -27,6 +27,19 @@ const safetyFeatures = [
     description: "Your exact location is only shared after a booking is confirmed. We never sell your personal data.",
     icon: Eye
   }
+]
+
+const providerSafety = [
+  { title: "Guest Verification", description: "All guests are verified before they can book. See ratings and reviews before accepting." },
+  { title: "Booking Control", description: "You control your availability, pricing, and can decline any booking request." },
+  { title: "Liability Coverage", description: "Every booking includes protection against property damage and liability claims." },
+  { title: "Emergency Support", description: "24/7 support team available for any issues that arise during bookings." },
+]
+
+const accessibilitySafety = [
+  { title: "Accurate Amenity Tags", description: "Providers must accurately list accessibility features. Misrepresentation results in removal." },
+  { title: "Accessibility Reviews", description: "Users can rate facilities on accessibility accuracy, helping others find suitable spaces." },
+  { title: "ADA Information", description: "We provide guidance to providers on ADA compliance and best practices." },
 ]
 </script>
 
@@ -87,6 +100,51 @@ const safetyFeatures = [
               </div>
               <Button variant="destructive" size="lg" class="rounded-full px-8 shrink-0">Contact Safety Team</Button>
            </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Provider Safety Section -->
+    <section class="py-20 px-6 bg-white">
+      <div class="container mx-auto max-w-6xl">
+        <div class="text-center max-w-3xl mx-auto mb-12">
+          <Home class="w-12 h-12 text-cyan-600 mx-auto mb-4" />
+          <h2 class="text-3xl font-bold text-slate-900 mb-4">Safety for Providers</h2>
+          <p class="text-slate-600">We protect our providers as much as our users. Your home, your rules.</p>
+        </div>
+
+        <div class="grid md:grid-cols-2 gap-6">
+          <div v-for="item in providerSafety" :key="item.title" class="bg-slate-50 p-6 rounded-xl border border-slate-100">
+            <h3 class="font-bold text-slate-900 mb-2">{{ item.title }}</h3>
+            <p class="text-slate-600">{{ item.description }}</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Accessibility Safety Section -->
+    <section class="py-20 px-6 bg-gradient-to-b from-cyan-50 to-white">
+      <div class="container mx-auto max-w-6xl">
+        <div class="text-center max-w-3xl mx-auto mb-12">
+          <Accessibility class="w-12 h-12 text-cyan-600 mx-auto mb-4" />
+          <h2 class="text-3xl font-bold text-slate-900 mb-4">Accessibility Accountability</h2>
+          <p class="text-slate-600">
+            We take accessibility seriously. Users who need accessible facilities can trust that our listings are accurate.
+          </p>
+        </div>
+
+        <div class="grid md:grid-cols-3 gap-6">
+          <div v-for="item in accessibilitySafety" :key="item.title" class="bg-white p-6 rounded-xl border border-slate-100 shadow-sm">
+            <h3 class="font-bold text-slate-900 mb-2">{{ item.title }}</h3>
+            <p class="text-sm text-slate-600">{{ item.description }}</p>
+          </div>
+        </div>
+
+        <div class="mt-12 text-center">
+          <p class="text-slate-600 mb-4">Questions about our safety policies?</p>
+          <Button variant="outline" size="lg" class="rounded-full px-8" @click="navigateTo('/contact')">
+            Contact Us
+          </Button>
         </div>
       </div>
     </section>

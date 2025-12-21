@@ -9,16 +9,23 @@ definePageMeta({
 
 const { login, isAuthenticated } = useAuth()
 const router = useRouter()
+const route = useRoute()
 
 const email = ref('')
 const password = ref('')
 const error = ref('')
 const loading = ref(false)
 
+// Get redirect URL from query params
+const redirectUrl = computed(() => {
+  const redirect = route.query.redirect as string
+  return redirect || '/'
+})
+
 // Redirect if already logged in
 watch(isAuthenticated, (authenticated) => {
   if (authenticated) {
-    navigateTo('/')
+    navigateTo(redirectUrl.value)
   }
 }, { immediate: true })
 
@@ -29,7 +36,7 @@ const handleLogin = async () => {
   try {
     const result = await login(email.value, password.value)
     if (result.success) {
-      navigateTo('/')
+      navigateTo(redirectUrl.value)
     } else {
       error.value = result.error || 'Invalid credentials'
     }

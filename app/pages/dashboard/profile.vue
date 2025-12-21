@@ -6,8 +6,37 @@
       <p class="mt-1 text-slate-600">Manage your account information and preferences</p>
     </div>
 
+    <!-- Avatar Upload Modal -->
+    <Teleport to="body">
+      <div
+        v-if="showAvatarUpload"
+        class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50"
+        @click.self="showAvatarUpload = false"
+      >
+        <Card class="w-full max-w-md">
+          <CardHeader>
+            <CardTitle>Update Profile Photo</CardTitle>
+          </CardHeader>
+          <CardContent class="space-y-4">
+            <ImageUpload
+              v-model="avatarFile"
+              :multiple="false"
+              placeholder="Upload a new profile photo"
+              :max-size-mb="5"
+              @update:model-value="handleAvatarChange"
+            />
+            <div class="flex justify-end">
+              <Button variant="outline" @click="showAvatarUpload = false">
+                Cancel
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    </Teleport>
+
     <!-- Profile Header Card -->
-    <Card>
+    <Card v-if="profile">
       <CardContent class="p-6">
         <div class="flex flex-col sm:flex-row items-start gap-6">
           <!-- Avatar -->
@@ -339,7 +368,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 import {
   Calendar,
   MapPin,
@@ -358,40 +387,98 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
+import { ImageUpload } from '@/components/ui/upload'
 
 definePageMeta({
-  layout: 'dashboard',
+  layout: 'dashboard-user',
 })
 
-// Profile data
-const profile = ref({
-  name: 'Sarah Johnson',
-  email: 'sarah.j@example.com',
-  avatar: 'https://i.pravatar.cc/150?img=5',
-  joinedDate: 'January 2024',
-  location: 'New York, NY',
-  stats: {
-    bookings: 24,
-    reviews: 18,
-    rating: 4.8,
+const { user, displayName } = useAuth()
+const payload = usePayload()
+const { toast } = useToast()
+const { confirm } = useConfirm()
+
+// Fetch user's bookings for stats
+const { data: bookingsData } = await useAsyncData(
+  'profile-bookings-stats',
+  async () => {
+    if (!user.value?.id) return null
+    return await payload.find('bookings', {
+      where: { user: { equals: user.value.id } },
+      limit: 1000,
+    })
   },
+  { watch: [() => user.value?.id] }
+)
+
+// Calculate profile stats
+const stats = computed(() => {
+  const bookings = bookingsData.value?.docs || []
+  return {
+    bookings: bookings.length,
+    reviews: 0, // TODO: Implement when reviews are available
+    rating: 0, // TODO: Calculate average rating from reviews
+  }
+})
+
+// Profile display data
+const profile = computed(() => {
+  if (!user.value) return null
+
+  const joinDate = user.value.createdAt
+    ? new Date(user.value.createdAt).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
+    : 'Recently'
+
+  return {
+    name: displayName.value,
+    email: user.value.email,
+    avatar: user.value.avatar?.url || 'https://i.pravatar.cc/150?img=5',
+    joinedDate: joinDate,
+    location: 'New York, NY', // TODO: Add location field to user schema if needed
+    stats: stats.value,
+  }
 })
 
 // Form states
 const isEditingPersonal = ref(false)
+const isSaving = ref(false)
 
 const formData = ref({
-  firstName: 'Sarah',
-  lastName: 'Johnson',
-  email: 'sarah.j@example.com',
-  phone: '+1 (555) 123-4567',
-  location: 'New York, NY',
-  bio: 'Frequent traveler and bathroom enthusiast. Always looking for clean, comfortable facilities in the city.',
+  firstName: '',
+  lastName: '',
+  email: '',
+  phone: '',
+  location: '',
+  bio: '',
 })
 
-const originalFormData = { ...formData.value }
+// Initialize form data when user is available
+const initFormData = () => {
+  if (user.value) {
+    formData.value = {
+      firstName: user.value.firstName || '',
+      lastName: user.value.lastName || '',
+      email: user.value.email || '',
+      phone: user.value.phone || '',
+      location: '',
+      bio: user.value.bio || '',
+    }
+  }
+}
 
-// Notifications
+// Watch for user changes and initialize form
+watch(() => user.value, initFormData, { immediate: true })
+
+const originalFormData = computed(() => ({
+  firstName: user.value?.firstName || '',
+  lastName: user.value?.lastName || '',
+  email: user.value?.email || '',
+  phone: user.value?.phone || '',
+  location: '',
+  bio: user.value?.bio || '',
+}))
+
+// Notifications - these would be stored in user preferences
 const notifications = ref({
   emailBookings: true,
   emailMessages: true,
@@ -400,41 +487,75 @@ const notifications = ref({
   pushNotifications: true,
 })
 
-// Payment methods
-const paymentMethods = ref([
-  {
-    id: 1,
-    type: 'Visa',
-    last4: '4242',
-    expiry: '12/25',
-    default: true,
-  },
-  {
-    id: 2,
-    type: 'Mastercard',
-    last4: '5555',
-    expiry: '09/26',
-    default: false,
-  },
-])
+// Payment methods - TODO: Implement when Stripe is integrated
+const paymentMethods = ref([])
 
 // Security
 const security = ref({
   twoFactor: false,
 })
 
+// Avatar upload state
+const showAvatarUpload = ref(false)
+const avatarFile = ref<{ url: string; id?: string | number } | null>(null)
+
 // Actions
 const uploadAvatar = () => {
-  alert('Avatar upload would open here')
+  showAvatarUpload.value = true
 }
 
-const savePersonalInfo = () => {
-  // Save personal info
-  profile.value.name = `${formData.value.firstName} ${formData.value.lastName}`
-  profile.value.email = formData.value.email
-  profile.value.location = formData.value.location
-  isEditingPersonal.value = false
-  alert('Profile updated successfully!')
+const handleAvatarChange = async (file: { url: string; id?: string | number } | null) => {
+  if (!file || !user.value?.id) return
+
+  try {
+    await payload.update('users', user.value.id, {
+      avatar: file.id || file.url,
+    })
+
+    user.value = {
+      ...user.value,
+      avatar: { url: file.url },
+    }
+
+    showAvatarUpload.value = false
+    toast.success('Avatar updated successfully!')
+  } catch (error) {
+    console.error('Failed to update avatar:', error)
+    toast.error('Failed to update avatar. Please try again.')
+  }
+}
+
+const savePersonalInfo = async () => {
+  if (!user.value?.id) return
+
+  isSaving.value = true
+  try {
+    await payload.update('users', user.value.id, {
+      firstName: formData.value.firstName,
+      lastName: formData.value.lastName,
+      email: formData.value.email,
+      phone: formData.value.phone,
+      bio: formData.value.bio,
+    })
+
+    // Update local user state
+    user.value = {
+      ...user.value,
+      firstName: formData.value.firstName,
+      lastName: formData.value.lastName,
+      email: formData.value.email,
+      phone: formData.value.phone,
+      bio: formData.value.bio,
+    }
+
+    isEditingPersonal.value = false
+    toast.success('Profile updated successfully!')
+  } catch (error) {
+    console.error('Failed to update profile:', error)
+    toast.error('Failed to update profile. Please try again.')
+  } finally {
+    isSaving.value = false
+  }
 }
 
 const cancelEditPersonal = () => {
@@ -442,32 +563,58 @@ const cancelEditPersonal = () => {
   isEditingPersonal.value = false
 }
 
-const saveNotifications = () => {
-  alert('Notification preferences saved!')
+const saveNotifications = async () => {
+  // TODO: Implement notification preferences update
+  toast.success('Notification preferences saved!')
 }
 
 const addPaymentMethod = () => {
-  alert('Add payment method dialog would open here')
+  // TODO: Implement Stripe payment method addition
+  toast.info('Payment method feature coming soon')
 }
 
-const removePaymentMethod = (id: number) => {
-  if (confirm('Are you sure you want to remove this payment method?')) {
+const removePaymentMethod = async (id: number) => {
+  const confirmed = await confirm({
+    title: 'Remove Payment Method',
+    message: 'Are you sure you want to remove this payment method?',
+    confirmText: 'Remove',
+    variant: 'destructive',
+  })
+
+  if (confirmed) {
     const index = paymentMethods.value.findIndex(m => m.id === id)
     if (index > -1) {
       paymentMethods.value.splice(index, 1)
+      toast.success('Payment method removed')
     }
   }
 }
 
 const changePassword = () => {
-  alert('Change password dialog would open here')
+  // TODO: Implement password change
+  toast.info('Password change feature coming soon')
 }
 
-const deleteAccount = () => {
-  if (confirm('Are you ABSOLUTELY sure you want to delete your account? This action cannot be undone.')) {
-    if (confirm('This will permanently delete all your bookings, messages, and reviews. Continue?')) {
-      alert('Account deletion would be processed here')
-    }
+const deleteAccount = async () => {
+  const firstConfirm = await confirm({
+    title: 'Delete Account',
+    message: 'Are you ABSOLUTELY sure you want to delete your account? This action cannot be undone.',
+    confirmText: 'Yes, Delete',
+    variant: 'destructive',
+  })
+
+  if (!firstConfirm) return
+
+  const secondConfirm = await confirm({
+    title: 'Final Confirmation',
+    message: 'This will permanently delete all your bookings, messages, and reviews. Continue?',
+    confirmText: 'Delete Everything',
+    variant: 'destructive',
+  })
+
+  if (secondConfirm) {
+    // TODO: Implement account deletion
+    toast.info('Account deletion feature coming soon')
   }
 }
 </script>

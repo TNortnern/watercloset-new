@@ -94,6 +94,7 @@ export const usePayload = () => {
     return await $fetch<T>(`/api/${collection}/${id}`, {
       method: 'PATCH',
       body: data,
+      credentials: 'include',
     })
   }
 
@@ -130,7 +131,16 @@ export const usePayload = () => {
    */
   const me = async () => {
     try {
-      return await $fetch<{ user: any }>('/api/users/me')
+      // Get cookies from the request in SSR context
+      const headers: Record<string, string> = {}
+      if (import.meta.server) {
+        const requestHeaders = useRequestHeaders(['cookie'])
+        if (requestHeaders.cookie) {
+          headers.cookie = requestHeaders.cookie
+        }
+      }
+
+      return await $fetch<{ user: any }>('/api/users/me?depth=1', { headers })
     } catch {
       return null
     }

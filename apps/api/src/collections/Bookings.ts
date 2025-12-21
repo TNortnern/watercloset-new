@@ -6,10 +6,19 @@ let stripeInstance: Stripe | null = null
 const getStripe = () => {
   if (!stripeInstance) {
     stripeInstance = new Stripe(process.env.STRIPE_SECRET_KEY || '', {
-      apiVersion: '2024-11-20.acacia',
+      apiVersion: '2025-02-24.acacia',
     })
   }
   return stripeInstance
+}
+
+const getRelationshipId = (value: unknown): number | string | null => {
+  if (typeof value === 'string' || typeof value === 'number') return value
+  if (value && typeof value === 'object' && 'id' in value) {
+    const id = (value as { id?: number | string }).id
+    return typeof id === 'string' || typeof id === 'number' ? id : null
+  }
+  return null
 }
 
 export const Bookings: CollectionConfig = {
@@ -27,10 +36,10 @@ export const Bookings: CollectionConfig = {
         // Providers can see bookings for their properties
         return {
           'property.owner': { equals: user.id },
-        }
+        } as any
       }
       // Users can see their own bookings
-      return { user: { equals: user.id } }
+      return { user: { equals: user.id } } as any
     },
     create: ({ req: { user } }) => !!user,
     update: ({ req: { user } }) => {
@@ -75,15 +84,19 @@ export const Bookings: CollectionConfig = {
         if (operation === 'create') {
           // Create Stripe Payment Intent
           try {
+            const propertyId = getRelationshipId(doc.property)
+            if (!propertyId) return
             const property = await req.payload.findByID({
               collection: 'properties',
-              id: typeof doc.property === 'string' ? doc.property : doc.property.id,
+              id: propertyId,
               depth: 1,
             })
 
+            const ownerId = getRelationshipId(property?.owner)
+            if (!ownerId) return
             const owner = await req.payload.findByID({
               collection: 'users',
-              id: typeof property.owner === 'string' ? property.owner : property.owner.id,
+              id: ownerId,
             })
 
             if (owner?.providerInfo?.stripeAccountId) {
@@ -110,7 +123,7 @@ export const Bookings: CollectionConfig = {
               })
             }
           } catch (error) {
-            req.payload.logger.error('Stripe payment intent creation failed:', error)
+            req.payload.logger.error(`Stripe payment intent creation failed: ${String(error)}`)
           }
         }
 
@@ -127,7 +140,7 @@ export const Bookings: CollectionConfig = {
       name: 'user',
       type: 'relationship',
       relationTo: 'users',
-      required: true,
+      // Not required in schema since it's auto-populated in beforeChange hook
       admin: {
         readOnly: true,
       },
@@ -256,6 +269,16 @@ export const Bookings: CollectionConfig = {
           type: 'number',
         },
       ],
+    },
+    // Review tracking
+    {
+      name: 'hasBeenReviewed',
+      type: 'checkbox',
+      defaultValue: false,
+      admin: {
+        readOnly: true,
+        description: 'Automatically set when user submits a review',
+      },
     },
   ],
   timestamps: true,

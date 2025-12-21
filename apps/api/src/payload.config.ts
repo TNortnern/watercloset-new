@@ -13,6 +13,9 @@ import { Reviews } from './collections/Reviews'
 import { Payouts } from './collections/Payouts'
 import { Media } from './collections/Media'
 
+// Custom Endpoints
+import { stripeEndpoints } from './endpoints/stripe'
+
 const filename = fileURLToPath(import.meta.url)
 const dirname = path.dirname(filename)
 
@@ -47,6 +50,8 @@ export default buildConfig({
     Payouts,
     Media,
   ],
+
+  endpoints: stripeEndpoints,
 
   typescript: {
     outputFile: path.resolve(dirname, 'payload-types.ts'),

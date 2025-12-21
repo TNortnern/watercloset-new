@@ -1,5 +1,7 @@
 <script setup lang="ts">
 import { appName } from '~/constants'
+import Toaster from '@/components/ui/toast/Toaster.vue'
+import ConfirmDialog from '@/components/ui/alert-dialog/ConfirmDialog.vue'
 
 useHead({
   title: appName,
@@ -14,4 +16,6 @@ useHead({
   <NuxtLayout>
     <NuxtPage />
   </NuxtLayout>
+  <Toaster />
+  <ConfirmDialog />
 </template>

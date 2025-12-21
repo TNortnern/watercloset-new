@@ -113,7 +113,7 @@
               </button>
               <button
                 v-if="request.status === 'pending'"
-                @click="console.log('Approve refund request:', request.requestId)"
+                @click="approveRefund(request.id)"
                 class="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg text-sm font-medium transition-colors flex items-center space-x-2"
               >
                 <Check class="w-4 h-4" />
@@ -121,7 +121,7 @@
               </button>
               <button
                 v-if="request.status === 'pending'"
-                @click="console.log('Decline refund request:', request.requestId)"
+                @click="declineRefund(request.id)"
                 class="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg text-sm font-medium transition-colors flex items-center space-x-2"
               >
                 <X class="w-4 h-4" />
@@ -279,14 +279,14 @@
           </button>
           <button
             v-if="selectedRequest.status === 'pending'"
-            @click="console.log('Decline refund request:', selectedRequest.requestId); selectedRequest = null"
+            @click="declineRefund(selectedRequest.id)"
             class="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg text-sm font-medium transition-colors"
           >
             Decline Request
           </button>
           <button
             v-if="selectedRequest.status === 'pending'"
-            @click="console.log('Approve and process refund:', selectedRequest.requestId); selectedRequest = null"
+            @click="approveRefund(selectedRequest.id)"
             class="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg text-sm font-medium transition-colors"
           >
             Approve & Process Refund
@@ -303,232 +303,173 @@ import { DollarSign, User, Calendar, Clock, Eye, Check, X, MessageSquare } from 
 
 definePageMeta({
   layout: 'dashboard-admin',
+  middleware: 'admin',
 })
+
+const payload = usePayload()
+const { toast } = useToast()
+const { confirm } = useConfirm()
+
+interface Booking {
+  id: string
+  user: {
+    id: string
+    firstName: string
+    lastName: string
+    email: string
+  }
+  property: {
+    id: string
+    name: string
+  }
+  startTime: string
+  totalAmount: number
+  status: 'confirmed' | 'completed' | 'cancelled' | 'refunded'
+  createdAt: string
+  updatedAt: string
+}
 
 const activeTab = ref('pending')
-const selectedRequest = ref(null)
+const selectedRequest = ref<any>(null)
+const loading = ref(true)
+const bookings = ref<Booking[]>([])
 
-const tabs = [
-  { label: 'Pending', value: 'pending', count: 4 },
-  { label: 'Processing', value: 'processing', count: 2 },
-  { label: 'Completed', value: 'completed', count: 8 },
-  { label: 'Declined', value: 'declined', count: 1 }
-]
+onMounted(async () => {
+  await fetchRefundBookings()
+})
 
-const refundRequests = [
-  {
-    id: 1,
-    requestId: 'RF-10001',
-    bookingReference: 'BC-12345',
-    userName: 'Emma Davis',
-    userEmail: 'emma.d@example.com',
-    amount: 15.00,
-    requestedDate: 'Dec 16, 2024',
-    bookingDate: 'Dec 18, 2024',
-    reason: 'The facility was not clean when I arrived. There were maintenance issues that made the bathroom unusable.',
-    status: 'pending',
-    activityLog: [
-      {
-        id: 1,
-        type: 'request',
-        title: 'Refund Request Submitted',
-        description: 'User submitted refund request citing cleanliness issues',
-        timestamp: 'Dec 16, 2024 at 2:30 PM'
-      }
-    ]
-  },
-  {
-    id: 2,
-    requestId: 'RF-10002',
-    bookingReference: 'BC-12356',
-    userName: 'Ryan Thompson',
-    userEmail: 'ryan.t@example.com',
-    amount: 35.00,
-    requestedDate: 'Dec 15, 2024',
-    bookingDate: 'Dec 16, 2024',
-    reason: 'Had to cancel due to emergency. Could not use the booking.',
-    status: 'pending',
-    activityLog: [
-      {
-        id: 1,
-        type: 'request',
-        title: 'Refund Request Submitted',
-        description: 'User cancelled booking due to emergency',
-        timestamp: 'Dec 15, 2024 at 9:15 AM'
-      }
-    ]
-  },
-  {
-    id: 3,
-    requestId: 'RF-10003',
-    bookingReference: 'BC-12367',
-    userName: 'John Smith',
-    userEmail: 'john.s@example.com',
-    amount: 22.00,
-    requestedDate: 'Dec 14, 2024',
-    bookingDate: 'Dec 15, 2024',
-    reason: 'Facility was closed when I arrived despite having a confirmed booking.',
-    status: 'pending',
-    activityLog: [
-      {
-        id: 1,
-        type: 'request',
-        title: 'Refund Request Submitted',
-        description: 'Facility was closed upon arrival',
-        timestamp: 'Dec 14, 2024 at 4:45 PM'
-      }
-    ]
-  },
-  {
-    id: 4,
-    requestId: 'RF-10004',
-    bookingReference: 'BC-12378',
-    userName: 'Lisa Anderson',
-    userEmail: 'lisa.a@example.com',
-    amount: 18.00,
-    requestedDate: 'Dec 13, 2024',
-    bookingDate: 'Dec 14, 2024',
-    reason: 'Double charged for the booking. Need refund for duplicate transaction.',
-    status: 'pending',
-    activityLog: [
-      {
-        id: 1,
-        type: 'request',
-        title: 'Refund Request Submitted',
-        description: 'Duplicate charge reported',
-        timestamp: 'Dec 13, 2024 at 11:20 AM'
-      }
-    ]
-  },
-  {
-    id: 5,
-    requestId: 'RF-10005',
-    bookingReference: 'BC-12389',
-    userName: 'Michael Brown',
-    userEmail: 'michael.b@example.com',
-    amount: 28.00,
-    requestedDate: 'Dec 12, 2024',
-    bookingDate: 'Dec 13, 2024',
-    reason: 'Amenities advertised were not available.',
-    status: 'processing',
-    activityLog: [
-      {
-        id: 1,
-        type: 'request',
-        title: 'Refund Request Submitted',
-        description: 'Missing advertised amenities',
-        timestamp: 'Dec 12, 2024 at 3:00 PM'
+async function fetchRefundBookings() {
+  try {
+    loading.value = true
+    // Fetch cancelled and refunded bookings
+    const response = await payload.find<Booking>('bookings', {
+      where: {
+        status: {
+          in: ['cancelled', 'refunded']
+        }
       },
-      {
-        id: 2,
-        type: 'review',
-        title: 'Under Review',
-        description: 'Admin team reviewing the request',
-        timestamp: 'Dec 12, 2024 at 5:30 PM'
-      }
-    ]
-  },
-  {
-    id: 6,
-    requestId: 'RF-10006',
-    bookingReference: 'BC-12390',
-    userName: 'Sarah Wilson',
-    userEmail: 'sarah.w@example.com',
-    amount: 20.00,
-    requestedDate: 'Dec 11, 2024',
-    bookingDate: 'Dec 12, 2024',
-    reason: 'Accessibility features not as described.',
-    status: 'processing',
-    activityLog: [
-      {
-        id: 1,
-        type: 'request',
-        title: 'Refund Request Submitted',
-        description: 'Accessibility issues reported',
-        timestamp: 'Dec 11, 2024 at 1:15 PM'
-      },
-      {
-        id: 2,
-        type: 'review',
-        title: 'Under Review',
-        description: 'Verifying accessibility claims with provider',
-        timestamp: 'Dec 11, 2024 at 4:00 PM'
-      }
-    ]
-  },
-  {
-    id: 7,
-    requestId: 'RF-10007',
-    bookingReference: 'BC-12391',
-    userName: 'David Chen',
-    userEmail: 'david.c@example.com',
-    amount: 25.00,
-    requestedDate: 'Dec 8, 2024',
-    bookingDate: 'Dec 9, 2024',
-    reason: 'Facility maintenance made the space unusable.',
-    status: 'completed',
-    activityLog: [
-      {
-        id: 1,
-        type: 'request',
-        title: 'Refund Request Submitted',
-        description: 'Maintenance issues reported',
-        timestamp: 'Dec 8, 2024 at 10:00 AM'
-      },
-      {
-        id: 2,
-        type: 'review',
-        title: 'Under Review',
-        description: 'Reviewing maintenance logs',
-        timestamp: 'Dec 8, 2024 at 2:00 PM'
-      },
-      {
-        id: 3,
-        type: 'approved',
-        title: 'Refund Approved',
-        description: 'Full refund processed',
-        timestamp: 'Dec 9, 2024 at 11:00 AM'
-      }
-    ]
-  },
-  {
-    id: 8,
-    requestId: 'RF-10008',
-    bookingReference: 'BC-12392',
-    userName: 'Tom Harris',
-    userEmail: 'tom.h@example.com',
-    amount: 12.00,
-    requestedDate: 'Dec 5, 2024',
-    bookingDate: 'Dec 6, 2024',
-    reason: 'Changed mind about the booking.',
-    status: 'declined',
-    activityLog: [
-      {
-        id: 1,
-        type: 'request',
-        title: 'Refund Request Submitted',
-        description: 'Cancellation request',
-        timestamp: 'Dec 5, 2024 at 8:00 AM'
-      },
-      {
-        id: 2,
-        type: 'review',
-        title: 'Under Review',
-        description: 'Reviewing cancellation policy',
-        timestamp: 'Dec 5, 2024 at 10:00 AM'
-      },
-      {
-        id: 3,
-        type: 'declined',
-        title: 'Refund Declined',
-        description: 'Outside cancellation window per policy',
-        timestamp: 'Dec 5, 2024 at 3:00 PM'
-      }
-    ]
+      limit: 1000,
+      depth: 2,
+      sort: '-updatedAt'
+    })
+    bookings.value = response.docs
+  } catch (error) {
+    console.error('Failed to fetch refund bookings:', error)
+  } finally {
+    loading.value = false
   }
-]
+}
+
+// Transform bookings into refund request format
+const refundRequests = computed(() => {
+  return bookings.value.map(booking => {
+    const user = booking.user
+    const firstName = typeof user === 'object' ? user.firstName : ''
+    const lastName = typeof user === 'object' ? user.lastName : ''
+    const email = typeof user === 'object' ? user.email : ''
+
+    // Map booking status to refund status
+    let status = 'pending'
+    if (booking.status === 'refunded') {
+      status = 'completed'
+    } else if (booking.status === 'cancelled') {
+      status = 'pending' // Cancelled bookings need refund decision
+    }
+
+    const activityLog = [
+      {
+        id: 1,
+        type: 'request',
+        title: 'Booking Cancelled',
+        description: 'Booking was cancelled and may require refund',
+        timestamp: formatDateTime(booking.updatedAt)
+      }
+    ]
+
+    if (booking.status === 'refunded') {
+      activityLog.push({
+        id: 2,
+        type: 'approved',
+        title: 'Refund Processed',
+        description: 'Full refund has been processed',
+        timestamp: formatDateTime(booking.updatedAt)
+      })
+    }
+
+    return {
+      id: booking.id,
+      requestId: `RF-${booking.id.slice(0, 6).toUpperCase()}`,
+      bookingReference: `BC-${booking.id.slice(0, 6).toUpperCase()}`,
+      userName: `${firstName} ${lastName}`.trim() || email,
+      userEmail: email,
+      amount: (booking.totalAmount || 0) / 100,
+      requestedDate: formatDate(booking.updatedAt),
+      bookingDate: formatDate(booking.startTime),
+      reason: 'Booking was cancelled by user or provider.',
+      status,
+      activityLog
+    }
+  })
+})
+
+const tabs = computed(() => {
+  const pending = refundRequests.value.filter(r => r.status === 'pending').length
+  const processing = refundRequests.value.filter(r => r.status === 'processing').length
+  const completed = refundRequests.value.filter(r => r.status === 'completed').length
+  const declined = refundRequests.value.filter(r => r.status === 'declined').length
+
+  return [
+    { label: 'Pending', value: 'pending', count: pending },
+    { label: 'Processing', value: 'processing', count: processing },
+    { label: 'Completed', value: 'completed', count: completed },
+    { label: 'Declined', value: 'declined', count: declined }
+  ]
+})
 
 const filteredRequests = computed(() => {
-  return refundRequests.filter(request => request.status === activeTab.value)
+  return refundRequests.value.filter(request => request.status === activeTab.value)
 })
+
+function formatDate(dateString: string): string {
+  const date = new Date(dateString)
+  return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+}
+
+function formatDateTime(dateString: string): string {
+  const date = new Date(dateString)
+  return `${formatDate(dateString)} at ${date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}`
+}
+
+async function approveRefund(bookingId: string) {
+  try {
+    await payload.update('bookings', bookingId, { status: 'refunded' })
+    await fetchRefundBookings()
+    selectedRequest.value = null
+    toast.success('Refund processed successfully')
+  } catch (error) {
+    console.error('Failed to approve refund:', error)
+    toast.error('Failed to process refund')
+  }
+}
+
+async function declineRefund(bookingId: string) {
+  const confirmed = await confirm({
+    title: 'Decline Refund',
+    message: 'Are you sure you want to decline this refund request?',
+    confirmText: 'Decline',
+    variant: 'destructive',
+  })
+  if (!confirmed) return
+
+  try {
+    // Mark as completed without refund (keep cancelled status)
+    // In a real app, you might have a separate refund status field
+    await fetchRefundBookings()
+    selectedRequest.value = null
+    toast.info('Refund declined. Booking remains cancelled without refund.')
+  } catch (error) {
+    console.error('Failed to decline refund:', error)
+    toast.error('Failed to decline refund')
+  }
+}
 </script>

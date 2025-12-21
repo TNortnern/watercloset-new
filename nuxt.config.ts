@@ -2,6 +2,24 @@ import { pwa } from './app/config/pwa'
 import { appDescription } from './app/constants/index'
 
 export default defineNuxtConfig({
+  runtimeConfig: {
+    // Server-side only (not exposed to client)
+    stripeSecretKey: process.env.STRIPE_SECRET_KEY || '',
+    public: {
+      apiUrl: process.env.NUXT_PUBLIC_API_URL || 'http://localhost:3001',
+      geoapifyKey: process.env.NUXT_PUBLIC_GEOAPIFY_KEY || '',
+      stripePublicKey: process.env.NUXT_PUBLIC_STRIPE_KEY || '',
+      googleMapsApiKey: process.env.NUXT_PUBLIC_GOOGLE_MAPS_API_KEY || '',
+    },
+  },
+
+  // API routes are now handled by server/api/* files instead of proxy
+  // routeRules: {
+  //   '/api/**': {
+  //     proxy: { to: 'http://localhost:3001/api/**' },
+  //   },
+  // },
+
   modules: [
     '@nuxtjs/tailwindcss',
     'shadcn-nuxt',

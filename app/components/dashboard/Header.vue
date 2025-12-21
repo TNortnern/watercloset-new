@@ -44,7 +44,7 @@
         <div class="relative">
           <button
             class="p-2 rounded-lg hover:bg-slate-100 transition-colors relative"
-            @click="notificationsOpen = !notificationsOpen"
+            @click.stop="notificationsOpen = !notificationsOpen"
           >
             <Bell class="w-5 h-5 text-slate-600" />
             <!-- Notification Badge -->
@@ -135,7 +135,7 @@
         <div class="relative">
           <button
             class="flex items-center space-x-2 p-1.5 rounded-lg hover:bg-slate-100 transition-colors"
-            @click="userMenuOpen = !userMenuOpen"
+            @click.stop="userMenuOpen = !userMenuOpen"
           >
             <div
               v-if="user.avatar"
@@ -242,13 +242,11 @@ import {
   ChevronDown,
   User,
   Settings,
-  CreditCard,
   HelpCircle,
   LogOut,
   Calendar,
-  MessageSquare,
-  CheckCircle,
-  AlertCircle
+  Heart,
+  LayoutDashboard
 } from 'lucide-vue-next'
 import { Input } from '@/components/ui/input'
 
@@ -276,52 +274,16 @@ const notificationsOpen = ref(false)
 const userMenuOpen = ref(false)
 const mobileSearchOpen = ref(false)
 
-const unreadCount = ref(3)
-
-const notifications = ref([
-  {
-    id: 1,
-    message: 'New booking request for Premium Suite',
-    time: '5 minutes ago',
-    read: false,
-    icon: Calendar,
-    iconBg: 'bg-cyan-100',
-    iconColor: 'text-cyan-600'
-  },
-  {
-    id: 2,
-    message: 'You have a new message from Sarah',
-    time: '1 hour ago',
-    read: false,
-    icon: MessageSquare,
-    iconBg: 'bg-purple-100',
-    iconColor: 'text-purple-600'
-  },
-  {
-    id: 3,
-    message: 'Your listing "Executive Washroom" was approved',
-    time: '2 hours ago',
-    read: false,
-    icon: CheckCircle,
-    iconBg: 'bg-green-100',
-    iconColor: 'text-green-600'
-  },
-  {
-    id: 4,
-    message: 'Payment received: $50.00',
-    time: '1 day ago',
-    read: true,
-    icon: CreditCard,
-    iconBg: 'bg-blue-100',
-    iconColor: 'text-blue-600'
-  },
-])
+// TODO: Fetch real notifications from API
+const unreadCount = ref(0)
+const notifications = ref<any[]>([])
 
 const userMenuItems = [
-  { name: 'Your Profile', href: '/dashboard/profile', icon: User },
+  { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
+  { name: 'Favorites', href: '/dashboard/favorites', icon: Heart },
+  { name: 'Profile', href: '/dashboard/profile', icon: User },
   { name: 'Settings', href: '/dashboard/settings', icon: Settings },
-  { name: 'Billing', href: '/dashboard/billing', icon: CreditCard },
-  { name: 'Help & Support', href: '/help', icon: HelpCircle },
+  { name: 'Help & Support', href: '/contact', icon: HelpCircle },
 ]
 
 const markAllRead = () => {

@@ -27,11 +27,11 @@
       <!-- User Profile Card -->
       <div class="lg:col-span-1">
         <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-          <div class="text-center">
+          <div v-if="user" class="text-center">
             <div class="w-24 h-24 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white font-bold text-3xl mx-auto">
-              {{ user.initials }}
+              {{ userInitials }}
             </div>
-            <h2 class="text-xl font-bold text-gray-900 mt-4">{{ user.name }}</h2>
+            <h2 class="text-xl font-bold text-gray-900 mt-4">{{ userName }}</h2>
             <p class="text-gray-600 text-sm mt-1">{{ user.email }}</p>
 
             <div class="flex items-center justify-center space-x-2 mt-4">
@@ -43,32 +43,28 @@
               ]">
                 {{ user.role.charAt(0).toUpperCase() + user.role.slice(1) }}
               </span>
-              <span :class="[
-                'px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full',
-                user.status === 'active' && 'bg-green-100 text-green-800',
-                user.status === 'suspended' && 'bg-red-100 text-red-800'
-              ]">
-                {{ user.status.charAt(0).toUpperCase() + user.status.slice(1) }}
+              <span class="px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">
+                Active
               </span>
             </div>
           </div>
 
-          <div class="mt-6 pt-6 border-t border-gray-200 space-y-4">
+          <div v-if="user" class="mt-6 pt-6 border-t border-gray-200 space-y-4">
             <div class="flex items-center justify-between">
               <span class="text-sm text-gray-600">Member Since</span>
-              <span class="text-sm font-medium text-gray-900">{{ user.joinedDate }}</span>
+              <span class="text-sm font-medium text-gray-900">{{ formatDate(user.createdAt) }}</span>
             </div>
             <div class="flex items-center justify-between">
               <span class="text-sm text-gray-600">Total Bookings</span>
-              <span class="text-sm font-medium text-gray-900">{{ user.bookingsCount }}</span>
+              <span class="text-sm font-medium text-gray-900">{{ bookings.length }}</span>
             </div>
             <div class="flex items-center justify-between">
               <span class="text-sm text-gray-600">Total Spent</span>
-              <span class="text-sm font-medium text-gray-900">${{ user.totalSpent.toLocaleString() }}</span>
+              <span class="text-sm font-medium text-gray-900">${{ totalSpent.toLocaleString() }}</span>
             </div>
             <div class="flex items-center justify-between">
-              <span class="text-sm text-gray-600">Last Login</span>
-              <span class="text-sm font-medium text-gray-900">{{ user.lastLogin }}</span>
+              <span class="text-sm text-gray-600">Last Updated</span>
+              <span class="text-sm font-medium text-gray-900">{{ formatTimeAgo(user.updatedAt) }}</span>
             </div>
           </div>
 
@@ -93,29 +89,23 @@
 
       <!-- Main Content -->
       <div class="lg:col-span-2 space-y-6">
-        <!-- Activity History -->
+        <!-- Recent Activity -->
         <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-          <h3 class="text-lg font-semibold text-gray-900 mb-4">Activity History</h3>
-          <div class="space-y-4">
-            <div v-for="activity in activityHistory" :key="activity.id" class="flex items-start space-x-3 pb-4 border-b border-gray-100 last:border-0 last:pb-0">
-              <div :class="[
-                'p-2 rounded-lg',
-                activity.type === 'booking' && 'bg-green-50',
-                activity.type === 'login' && 'bg-blue-50',
-                activity.type === 'profile' && 'bg-purple-50',
-                activity.type === 'payment' && 'bg-emerald-50'
-              ]">
-                <Calendar v-if="activity.type === 'booking'" class="w-5 h-5 text-green-600" />
-                <LogIn v-if="activity.type === 'login'" class="w-5 h-5 text-blue-600" />
-                <User v-if="activity.type === 'profile'" class="w-5 h-5 text-purple-600" />
-                <CreditCard v-if="activity.type === 'payment'" class="w-5 h-5 text-emerald-600" />
+          <h3 class="text-lg font-semibold text-gray-900 mb-4">Recent Bookings</h3>
+          <div v-if="bookings.length > 0" class="space-y-4">
+            <div v-for="booking in bookings.slice(0, 5)" :key="booking.id" class="flex items-start space-x-3 pb-4 border-b border-gray-100 last:border-0 last:pb-0">
+              <div class="p-2 rounded-lg bg-green-50">
+                <Calendar class="w-5 h-5 text-green-600" />
               </div>
               <div class="flex-1 min-w-0">
-                <p class="text-sm font-medium text-gray-900">{{ activity.title }}</p>
-                <p class="text-sm text-gray-600 mt-1">{{ activity.description }}</p>
-                <p class="text-xs text-gray-500 mt-1">{{ activity.timestamp }}</p>
+                <p class="text-sm font-medium text-gray-900">{{ booking.property?.name || 'Property' }}</p>
+                <p class="text-sm text-gray-600 mt-1">${{ (booking.totalAmount / 100).toFixed(2) }} - {{ booking.status }}</p>
+                <p class="text-xs text-gray-500 mt-1">{{ formatDateTime(booking.createdAt) }}</p>
               </div>
             </div>
+          </div>
+          <div v-else class="text-center py-8 text-gray-500">
+            No bookings yet
           </div>
         </div>
 
@@ -137,17 +127,18 @@
                 </tr>
               </thead>
               <tbody class="bg-white divide-y divide-gray-200">
-                <tr v-for="booking in bookings" :key="booking.id" class="hover:bg-gray-50">
+                <tr v-for="booking in bookings.slice(0, 10)" :key="booking.id" class="hover:bg-gray-50">
                   <td class="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900">{{ booking.id }}</td>
-                  <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-900">{{ booking.property }}</td>
-                  <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-600">{{ booking.date }}</td>
-                  <td class="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900">${{ booking.amount }}</td>
+                  <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-900">{{ booking.property?.name || 'N/A' }}</td>
+                  <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-600">{{ formatDate(booking.startTime) }}</td>
+                  <td class="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900">${{ (booking.totalAmount / 100).toFixed(2) }}</td>
                   <td class="px-4 py-3 whitespace-nowrap">
                     <span :class="[
                       'px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full',
                       booking.status === 'completed' && 'bg-green-100 text-green-800',
                       booking.status === 'confirmed' && 'bg-blue-100 text-blue-800',
-                      booking.status === 'cancelled' && 'bg-red-100 text-red-800'
+                      booking.status === 'cancelled' && 'bg-red-100 text-red-800',
+                      booking.status === 'pending' && 'bg-yellow-100 text-yellow-800'
                     ]">
                       {{ booking.status.charAt(0).toUpperCase() + booking.status.slice(1) }}
                     </span>
@@ -159,7 +150,7 @@
         </div>
 
         <!-- Contact Information -->
-        <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+        <div v-if="user" class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
           <h3 class="text-lg font-semibold text-gray-900 mb-4">Contact Information</h3>
           <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
@@ -168,11 +159,11 @@
             </div>
             <div>
               <label class="text-sm font-medium text-gray-600">Phone</label>
-              <p class="text-sm text-gray-900 mt-1">{{ user.phone }}</p>
+              <p class="text-sm text-gray-900 mt-1">{{ user.phone || 'Not provided' }}</p>
             </div>
             <div class="md:col-span-2">
-              <label class="text-sm font-medium text-gray-600">Address</label>
-              <p class="text-sm text-gray-900 mt-1">{{ user.address }}</p>
+              <label class="text-sm font-medium text-gray-600">User ID</label>
+              <p class="text-sm text-gray-900 mt-1 font-mono">{{ user.id }}</p>
             </div>
           </div>
         </div>
@@ -186,100 +177,108 @@ import { ArrowLeft, Mail, Edit, CheckCircle, Ban, Trash2, Calendar, LogIn, User,
 
 definePageMeta({
   layout: 'dashboard-admin',
+  middleware: 'admin',
 })
 
 const route = useRoute()
-const userId = route.params.id
+const payload = usePayload()
+const { toast } = useToast()
+const userId = route.params.id as string
 
-// Mock user data - in a real app, this would be fetched from an API
-const user = {
-  id: userId,
-  name: 'Sarah Johnson',
-  initials: 'SJ',
-  email: 'sarah.johnson@example.com',
-  phone: '+1 (555) 123-4567',
-  address: '123 Main Street, New York, NY 10001',
-  role: 'user',
-  status: 'active',
-  joinedDate: 'Dec 15, 2024',
-  lastLogin: '2 hours ago',
-  bookingsCount: 12,
-  totalSpent: 1450
+interface UserData {
+  id: string
+  email: string
+  firstName: string
+  lastName: string
+  phone?: string
+  role: 'user' | 'provider' | 'admin'
+  createdAt: string
+  updatedAt: string
 }
 
-const activityHistory = [
-  {
-    id: 1,
-    type: 'booking',
-    title: 'New Booking Created',
-    description: 'Booked Premium Suite at Downtown Plaza',
-    timestamp: 'Dec 18, 2024 at 10:30 AM'
-  },
-  {
-    id: 2,
-    type: 'payment',
-    title: 'Payment Processed',
-    description: 'Paid $45.00 for booking #BC-12345',
-    timestamp: 'Dec 18, 2024 at 10:28 AM'
-  },
-  {
-    id: 3,
-    type: 'login',
-    title: 'Account Login',
-    description: 'Logged in from New York, NY',
-    timestamp: 'Dec 18, 2024 at 10:15 AM'
-  },
-  {
-    id: 4,
-    type: 'profile',
-    title: 'Profile Updated',
-    description: 'Updated contact information',
-    timestamp: 'Dec 17, 2024 at 3:45 PM'
-  },
-  {
-    id: 5,
-    type: 'booking',
-    title: 'Booking Completed',
-    description: 'Completed stay at Executive Lounge',
-    timestamp: 'Dec 16, 2024 at 6:00 PM'
-  }
-]
+const user = ref<any>(null)
+const bookings = ref<any[]>([])
+const loading = ref(true)
 
-const bookings = [
-  {
-    id: '#BC-12345',
-    property: 'Premium Suite',
-    date: 'Dec 18, 2024',
-    amount: 45,
-    status: 'confirmed'
-  },
-  {
-    id: '#BC-12344',
-    property: 'Executive Lounge',
-    date: 'Dec 16, 2024',
-    amount: 35,
-    status: 'completed'
-  },
-  {
-    id: '#BC-12343',
-    property: 'Deluxe Bathroom',
-    date: 'Dec 14, 2024',
-    amount: 50,
-    status: 'completed'
-  },
-  {
-    id: '#BC-12342',
-    property: 'Standard Suite',
-    date: 'Dec 12, 2024',
-    amount: 30,
-    status: 'completed'
-  },
-  {
-    id: '#BC-12341',
-    property: 'Premium Suite',
-    date: 'Dec 10, 2024',
-    amount: 45,
-    status: 'cancelled'
+// Computed properties
+const userInitials = computed(() => {
+  if (!user.value) return ''
+  const first = user.value.firstName?.[0] || ''
+  const last = user.value.lastName?.[0] || ''
+  return `${first}${last}`.toUpperCase()
+})
+
+const userName = computed(() => {
+  if (!user.value) return ''
+  return `${user.value.firstName || ''} ${user.value.lastName || ''}`.trim()
+})
+
+const totalSpent = computed(() => {
+  return Math.round(bookings.value.reduce((sum, b) => sum + (b.totalAmount || 0), 0) / 100)
+})
+
+// Fetch user data
+onMounted(async () => {
+  try {
+    loading.value = true
+
+    // Fetch user
+    user.value = await payload.findByID<UserData>('users', userId)
+
+    // Fetch user's bookings
+    const bookingsResponse = await payload.find('bookings', {
+      where: { user: { equals: userId } },
+      limit: 100,
+      depth: 2,
+      sort: '-createdAt'
+    })
+
+    bookings.value = bookingsResponse.docs
+
+  } catch (error) {
+    console.error('Failed to fetch user data:', error)
+  } finally {
+    loading.value = false
   }
-]
+})
+
+function formatDate(dateString: string): string {
+  const date = new Date(dateString)
+  return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+}
+
+function formatDateTime(dateString: string): string {
+  const date = new Date(dateString)
+  return date.toLocaleDateString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit'
+  })
+}
+
+function formatTimeAgo(dateString: string): string {
+  const date = new Date(dateString)
+  const now = new Date()
+  const seconds = Math.floor((now.getTime() - date.getTime()) / 1000)
+
+  if (seconds < 60) return `${seconds} seconds ago`
+  if (seconds < 3600) return `${Math.floor(seconds / 60)} minutes ago`
+  if (seconds < 86400) return `${Math.floor(seconds / 3600)} hours ago`
+  return `${Math.floor(seconds / 86400)} days ago`
+}
+
+async function changeUserRole(newRole: string) {
+  try {
+    await payload.update('users', userId, { role: newRole })
+    if (user.value) {
+      user.value.role = newRole
+    }
+    toast.success('User role updated')
+  } catch (error) {
+    console.error('Failed to update user role:', error)
+    toast.error('Failed to update user role')
+  }
+}
 </script>

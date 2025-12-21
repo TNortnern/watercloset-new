@@ -87,29 +87,29 @@
               <td class="px-6 py-4 whitespace-nowrap">
                 <div class="flex items-center space-x-2">
                   <Hash class="w-4 h-4 text-gray-400" />
-                  <span class="text-sm font-mono font-medium text-gray-900">{{ booking.confirmationCode }}</span>
+                  <span class="text-sm font-mono font-medium text-gray-900">{{ booking.id }}</span>
                 </div>
               </td>
               <td class="px-6 py-4 whitespace-nowrap">
                 <div>
-                  <div class="text-sm font-medium text-gray-900">{{ booking.userName }}</div>
-                  <div class="text-sm text-gray-500">{{ booking.userEmail }}</div>
+                  <div class="text-sm font-medium text-gray-900">{{ getUserName(booking) }}</div>
+                  <div class="text-sm text-gray-500">{{ getUserEmail(booking) }}</div>
                 </div>
               </td>
               <td class="px-6 py-4 whitespace-nowrap">
-                <div class="text-sm text-gray-900">{{ booking.providerName }}</div>
+                <div class="text-sm text-gray-900">{{ getProviderName(booking) }}</div>
               </td>
               <td class="px-6 py-4">
-                <div class="text-sm text-gray-900">{{ booking.property }}</div>
+                <div class="text-sm text-gray-900">{{ getPropertyName(booking) }}</div>
               </td>
               <td class="px-6 py-4 whitespace-nowrap">
                 <div>
-                  <div class="text-sm font-medium text-gray-900">{{ booking.date }}</div>
-                  <div class="text-sm text-gray-500">{{ booking.time }}</div>
+                  <div class="text-sm font-medium text-gray-900">{{ formatDate(booking.startTime) }}</div>
+                  <div class="text-sm text-gray-500">{{ formatTime(booking.startTime, booking.endTime) }}</div>
                 </div>
               </td>
               <td class="px-6 py-4 whitespace-nowrap">
-                <div class="text-sm font-semibold text-gray-900">${{ booking.amount.toFixed(2) }}</div>
+                <div class="text-sm font-semibold text-gray-900">${{ ((booking.totalAmount || 0) / 100).toFixed(2) }}</div>
               </td>
               <td class="px-6 py-4 whitespace-nowrap">
                 <span :class="[
@@ -133,7 +133,7 @@
                   </button>
                   <button
                     v-if="booking.status === 'confirmed'"
-                    @click="console.log('Cancel booking:', booking.confirmationCode)"
+                    @click="cancelBooking(booking.id)"
                     class="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
                     title="Cancel Booking"
                   >
@@ -141,7 +141,7 @@
                   </button>
                   <button
                     v-if="booking.status === 'completed' || booking.status === 'cancelled'"
-                    @click="console.log('Process refund for booking:', booking.confirmationCode)"
+                    @click="processRefund(booking.id)"
                     class="p-2 text-orange-600 hover:bg-orange-50 rounded-lg transition-colors"
                     title="Process Refund"
                   >
@@ -187,7 +187,7 @@
         <div class="bg-gradient-to-r from-blue-600 to-purple-600 px-6 py-4 flex items-center justify-between rounded-t-lg">
           <div>
             <h2 class="text-xl font-bold text-white">Booking Details</h2>
-            <p class="text-blue-100 text-sm mt-1">{{ selectedBooking.confirmationCode }}</p>
+            <p class="text-blue-100 text-sm mt-1">{{ selectedBooking.id }}</p>
           </div>
           <button
             @click="selectedBooking = null"
@@ -206,11 +206,11 @@
               <div class="space-y-2">
                 <div>
                   <p class="text-xs text-gray-500">Name</p>
-                  <p class="text-sm text-gray-900">{{ selectedBooking.userName }}</p>
+                  <p class="text-sm text-gray-900">{{ getUserName(selectedBooking) }}</p>
                 </div>
                 <div>
                   <p class="text-xs text-gray-500">Email</p>
-                  <p class="text-sm text-gray-900">{{ selectedBooking.userEmail }}</p>
+                  <p class="text-sm text-gray-900">{{ getUserEmail(selectedBooking) }}</p>
                 </div>
               </div>
             </div>
@@ -219,11 +219,11 @@
               <div class="space-y-2">
                 <div>
                   <p class="text-xs text-gray-500">Provider</p>
-                  <p class="text-sm text-gray-900">{{ selectedBooking.providerName }}</p>
+                  <p class="text-sm text-gray-900">{{ getProviderName(selectedBooking) }}</p>
                 </div>
                 <div>
                   <p class="text-xs text-gray-500">Property</p>
-                  <p class="text-sm text-gray-900">{{ selectedBooking.property }}</p>
+                  <p class="text-sm text-gray-900">{{ getPropertyName(selectedBooking) }}</p>
                 </div>
               </div>
             </div>
@@ -235,15 +235,15 @@
             <div class="grid grid-cols-2 gap-4">
               <div>
                 <p class="text-xs text-gray-500">Date</p>
-                <p class="text-sm text-gray-900">{{ selectedBooking.date }}</p>
+                <p class="text-sm text-gray-900">{{ formatDate(selectedBooking.startTime) }}</p>
               </div>
               <div>
                 <p class="text-xs text-gray-500">Time</p>
-                <p class="text-sm text-gray-900">{{ selectedBooking.time }}</p>
+                <p class="text-sm text-gray-900">{{ formatTime(selectedBooking.startTime, selectedBooking.endTime) }}</p>
               </div>
               <div>
                 <p class="text-xs text-gray-500">Amount</p>
-                <p class="text-sm font-semibold text-gray-900">${{ selectedBooking.amount.toFixed(2) }}</p>
+                <p class="text-sm font-semibold text-gray-900">${{ ((selectedBooking.totalAmount || 0) / 100).toFixed(2) }}</p>
               </div>
               <div>
                 <p class="text-xs text-gray-500">Status</p>
@@ -271,14 +271,14 @@
           </button>
           <button
             v-if="selectedBooking.status === 'confirmed'"
-            @click="console.log('Cancel booking:', selectedBooking.confirmationCode); selectedBooking = null"
+            @click="cancelBooking(selectedBooking.id)"
             class="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg text-sm font-medium transition-colors"
           >
             Cancel Booking
           </button>
           <button
             v-if="selectedBooking.status === 'completed' || selectedBooking.status === 'cancelled'"
-            @click="console.log('Process refund for booking:', selectedBooking.confirmationCode); selectedBooking = null"
+            @click="processRefund(selectedBooking.id)"
             class="px-4 py-2 bg-orange-600 hover:bg-orange-700 text-white rounded-lg text-sm font-medium transition-colors"
           >
             Process Refund
@@ -295,144 +295,121 @@ import { Search, Calendar, Hash, Eye, X, DollarSign, ChevronLeft, ChevronRight }
 
 definePageMeta({
   layout: 'dashboard-admin',
+  middleware: 'admin',
 })
 
+const payload = usePayload()
+const { toast } = useToast()
+const { confirm } = useConfirm()
+
+const loading = ref(true)
+const bookings = ref<any[]>([])
 const searchQuery = ref('')
 const selectedStatus = ref('all')
 const dateFrom = ref('')
 const dateTo = ref('')
-const selectedBooking = ref(null)
+const selectedBooking = ref<any>(null)
 
-const bookings = [
-  {
-    id: 1,
-    confirmationCode: 'BC-12345',
-    userName: 'Sarah Johnson',
-    userEmail: 'sarah.j@example.com',
-    providerName: 'Luxury Towers',
-    property: 'Premium Suite A',
-    date: 'Dec 20, 2024',
-    time: '10:00 AM - 11:00 AM',
-    amount: 25.00,
-    status: 'confirmed'
-  },
-  {
-    id: 2,
-    confirmationCode: 'BC-12346',
-    userName: 'Michael Chen',
-    userEmail: 'michael.c@example.com',
-    providerName: 'Downtown Plaza',
-    property: 'Executive Lounge',
-    date: 'Dec 19, 2024',
-    time: '2:00 PM - 3:00 PM',
-    amount: 30.00,
-    status: 'completed'
-  },
-  {
-    id: 3,
-    confirmationCode: 'BC-12347',
-    userName: 'Emma Davis',
-    userEmail: 'emma.d@example.com',
-    providerName: 'City Center',
-    property: 'Standard Bathroom',
-    date: 'Dec 18, 2024',
-    time: '11:30 AM - 12:00 PM',
-    amount: 15.00,
-    status: 'refunded'
-  },
-  {
-    id: 4,
-    confirmationCode: 'BC-12348',
-    userName: 'David Wilson',
-    userEmail: 'david.w@example.com',
-    providerName: 'Metro Business Park',
-    property: 'Deluxe Suite B',
-    date: 'Dec 21, 2024',
-    time: '9:00 AM - 10:00 AM',
-    amount: 28.00,
-    status: 'confirmed'
-  },
-  {
-    id: 5,
-    confirmationCode: 'BC-12349',
-    userName: 'Jessica Martinez',
-    userEmail: 'jessica.m@example.com',
-    providerName: 'Executive Suites',
-    property: 'Premium Bathroom',
-    date: 'Dec 17, 2024',
-    time: '3:30 PM - 4:00 PM',
-    amount: 20.00,
-    status: 'completed'
-  },
-  {
-    id: 6,
-    confirmationCode: 'BC-12350',
-    userName: 'Ryan Thompson',
-    userEmail: 'ryan.t@example.com',
-    providerName: 'Luxury Towers',
-    property: 'VIP Lounge',
-    date: 'Dec 16, 2024',
-    time: '1:00 PM - 2:00 PM',
-    amount: 35.00,
-    status: 'cancelled'
-  },
-  {
-    id: 7,
-    confirmationCode: 'BC-12351',
-    userName: 'Ashley Brown',
-    userEmail: 'ashley.b@example.com',
-    providerName: 'Downtown Plaza',
-    property: 'Standard Suite',
-    date: 'Dec 22, 2024',
-    time: '4:00 PM - 5:00 PM',
-    amount: 22.00,
-    status: 'confirmed'
-  },
-  {
-    id: 8,
-    confirmationCode: 'BC-12352',
-    userName: 'James Anderson',
-    userEmail: 'james.a@example.com',
-    providerName: 'City Center',
-    property: 'Executive Bathroom',
-    date: 'Dec 15, 2024',
-    time: '12:00 PM - 1:00 PM',
-    amount: 26.00,
-    status: 'completed'
-  },
-  {
-    id: 9,
-    confirmationCode: 'BC-12353',
-    userName: 'Olivia Garcia',
-    userEmail: 'olivia.g@example.com',
-    providerName: 'Metro Business Park',
-    property: 'Premium Suite C',
-    date: 'Dec 23, 2024',
-    time: '10:30 AM - 11:30 AM',
-    amount: 32.00,
-    status: 'confirmed'
-  },
-  {
-    id: 10,
-    confirmationCode: 'BC-12354',
-    userName: 'Daniel Lee',
-    userEmail: 'daniel.l@example.com',
-    providerName: 'Executive Suites',
-    property: 'Deluxe Lounge',
-    date: 'Dec 14, 2024',
-    time: '5:00 PM - 6:00 PM',
-    amount: 29.00,
-    status: 'completed'
+onMounted(async () => {
+  await fetchBookings()
+})
+
+async function fetchBookings() {
+  try {
+    loading.value = true
+    const response = await payload.find('bookings', {
+      limit: 1000,
+      depth: 2,
+      sort: '-createdAt'
+    })
+    bookings.value = response.docs
+  } catch (error) {
+    console.error('Failed to fetch bookings:', error)
+  } finally {
+    loading.value = false
   }
-]
+}
 
 const filteredBookings = computed(() => {
-  return bookings.filter(booking => {
+  return bookings.value.filter(booking => {
     const matchesSearch = !searchQuery.value ||
-      booking.confirmationCode.toLowerCase().includes(searchQuery.value.toLowerCase()) ||
-      booking.userEmail.toLowerCase().includes(searchQuery.value.toLowerCase())
+      booking.id.toLowerCase().includes(searchQuery.value.toLowerCase()) ||
+      (booking.user?.email || '').toLowerCase().includes(searchQuery.value.toLowerCase())
     const matchesStatus = selectedStatus.value === 'all' || booking.status === selectedStatus.value
     return matchesSearch && matchesStatus
   })
 })
+
+function getUserName(booking: any): string {
+  if (typeof booking.user === 'string') return 'Loading...'
+  return `${booking.user?.firstName || ''} ${booking.user?.lastName || ''}`.trim() || booking.user?.email || 'Unknown'
+}
+
+function getUserEmail(booking: any): string {
+  if (typeof booking.user === 'string') return ''
+  return booking.user?.email || ''
+}
+
+function getProviderName(booking: any): string {
+  if (typeof booking.property === 'string') return 'Loading...'
+  const owner = booking.property?.owner
+  if (typeof owner === 'string') return 'Loading...'
+  return `${owner?.firstName || ''} ${owner?.lastName || ''}`.trim() || owner?.email || 'Unknown'
+}
+
+function getPropertyName(booking: any): string {
+  if (typeof booking.property === 'string') return 'Loading...'
+  return booking.property?.name || 'Unknown Property'
+}
+
+function formatDate(dateString: string): string {
+  const date = new Date(dateString)
+  return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+}
+
+function formatTime(startTime: string, endTime: string): string {
+  const start = new Date(startTime)
+  const end = new Date(endTime)
+  return `${start.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })} - ${end.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}`
+}
+
+async function cancelBooking(bookingId: string) {
+  const confirmed = await confirm({
+    title: 'Cancel Booking',
+    message: 'Are you sure you want to cancel this booking?',
+    confirmText: 'Cancel Booking',
+    variant: 'destructive',
+  })
+  if (!confirmed) return
+  try {
+    await payload.update('bookings', bookingId, { status: 'cancelled' })
+    const booking = bookings.value.find(b => b.id === bookingId)
+    if (booking) booking.status = 'cancelled'
+    selectedBooking.value = null
+    toast.success('Booking cancelled')
+  } catch (error) {
+    console.error('Failed to cancel booking:', error)
+    toast.error('Failed to cancel booking')
+  }
+}
+
+async function processRefund(bookingId: string) {
+  const confirmed = await confirm({
+    title: 'Process Refund',
+    message: 'Are you sure you want to process a refund for this booking?',
+    confirmText: 'Process Refund',
+    variant: 'default',
+  })
+  if (!confirmed) return
+  try {
+    await payload.update('bookings', bookingId, { status: 'refunded' })
+    const booking = bookings.value.find(b => b.id === bookingId)
+    if (booking) booking.status = 'refunded'
+    selectedBooking.value = null
+    toast.success('Refund processed')
+  } catch (error) {
+    console.error('Failed to process refund:', error)
+    toast.error('Failed to process refund')
+  }
+}
 </script>

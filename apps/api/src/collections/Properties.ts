@@ -1,4 +1,6 @@
 import type { CollectionConfig } from 'payload'
+import type { PayloadRequest } from 'payload'
+import { sql } from 'drizzle-orm'
 
 export const Properties: CollectionConfig = {
   slug: 'properties',
@@ -7,6 +9,113 @@ export const Properties: CollectionConfig = {
     group: 'Listings',
     defaultColumns: ['name', 'owner', 'status', 'pricePerMinute'],
   },
+  endpoints: [
+    {
+      path: '/nearby',
+      method: 'get',
+      handler: async (req: PayloadRequest) => {
+        const url = new URL(req.url || '', 'http://localhost')
+        const lat = parseFloat(url.searchParams.get('lat') || url.searchParams.get('latitude') || '0')
+        const lng = parseFloat(url.searchParams.get('lng') || url.searchParams.get('longitude') || '0')
+        const radius = parseFloat(url.searchParams.get('radius') || '5000') // meters
+        const limit = parseInt(url.searchParams.get('limit') || '20')
+
+        if (!lat || !lng) {
+          return Response.json(
+            { error: 'lat and lng are required' },
+            { status: 400 }
+          )
+        }
+
+        try {
+          // Use raw SQL for PostGIS distance calculation
+          const db = req.payload.db
+          const drizzle = (db as any).drizzle
+
+          if (!drizzle) {
+            // Fallback to standard find without distance
+            const result = await req.payload.find({
+              collection: 'properties',
+              where: {
+                status: { equals: 'active' },
+              },
+              limit,
+              depth: 1,
+            })
+            return Response.json(result)
+          }
+
+          // Query with PostGIS distance calculation using sql template
+          const query = sql`
+            SELECT
+              p.*,
+              ST_X(p.location_coordinates::geometry) as coord_lng,
+              ST_Y(p.location_coordinates::geometry) as coord_lat,
+              ST_Distance(
+                p.location_coordinates::geography,
+                ST_SetSRID(ST_MakePoint(${lng}, ${lat}), 4326)::geography
+              ) as distance
+            FROM properties p
+            WHERE p.status = 'active'
+              AND ST_DWithin(
+                p.location_coordinates::geography,
+                ST_SetSRID(ST_MakePoint(${lng}, ${lat}), 4326)::geography,
+                ${radius}
+              )
+            ORDER BY distance ASC
+            LIMIT ${limit}
+          `
+
+          const result = await drizzle.execute(query)
+          const rows = result.rows || result
+
+          // Transform to Payload format
+          const docs = (rows as any[]).map((row: any) => ({
+            id: row.id,
+            name: row.name,
+            description: row.description,
+            pricePerMinute: row.price_per_minute,
+            type: row.type,
+            status: row.status,
+            location: {
+              address: row.location_address,
+              city: row.location_city,
+              state: row.location_state,
+              zipCode: row.location_zip_code,
+              coordinates: row.coord_lng && row.coord_lat ? [row.coord_lng, row.coord_lat] : null,
+            },
+            stats: {
+              averageRating: row.stats_average_rating,
+              reviewCount: row.stats_review_count,
+            },
+            distance: Math.round(row.distance),
+          }))
+
+          return Response.json({
+            docs,
+            totalDocs: docs.length,
+            limit,
+            totalPages: 1,
+            page: 1,
+            hasNextPage: false,
+            hasPrevPage: false,
+          })
+        } catch (error) {
+          console.error('Nearby search error:', error)
+          // Fallback to standard find
+          const result = await req.payload.find({
+            collection: 'properties',
+            where: {
+              status: { equals: 'active' },
+            },
+            limit,
+            depth: 1,
+          })
+          return Response.json(result)
+        }
+      },
+    },
+  ],
   access: {
     read: () => true, // Public can view active properties
     create: ({ req: { user } }) => user?.role === 'provider' || user?.role === 'admin',

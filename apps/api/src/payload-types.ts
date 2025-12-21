@@ -134,7 +134,9 @@ export interface User {
   firstName: string;
   lastName: string;
   phone?: string | null;
+  bio?: string | null;
   avatar?: (number | null) | Media;
+  favorites?: (number | Property)[] | null;
   providerInfo?: {
     businessName?: string | null;
     businessType?: ('individual' | 'llc' | 'corporation') | null;
@@ -318,7 +320,7 @@ export interface Property {
  */
 export interface Booking {
   id: number;
-  user: number | User;
+  user?: (number | null) | User;
   property: number | Property;
   startTime: string;
   endTime: string;
@@ -348,6 +350,10 @@ export interface Booking {
     reason?: string | null;
     refundAmount?: number | null;
   };
+  /**
+   * Automatically set when user submits a review
+   */
+  hasBeenReviewed?: boolean | null;
   updatedAt: string;
   createdAt: string;
 }
@@ -499,7 +505,9 @@ export interface UsersSelect<T extends boolean = true> {
   firstName?: T;
   lastName?: T;
   phone?: T;
+  bio?: T;
   avatar?: T;
+  favorites?: T;
   providerInfo?:
     | T
     | {
@@ -617,6 +625,7 @@ export interface BookingsSelect<T extends boolean = true> {
         reason?: T;
         refundAmount?: T;
       };
+  hasBeenReviewed?: T;
   updatedAt?: T;
   createdAt?: T;
 }

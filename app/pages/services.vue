@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { MapPin, Building, ShieldCheck, Zap } from 'lucide-vue-next'
+import { MapPin, Building, ShieldCheck, Zap, Home, DollarSign, Accessibility, Calendar, Users } from 'lucide-vue-next'
 import { Button } from '@/components/ui/button'
 
 definePageMeta({
@@ -8,23 +8,30 @@ definePageMeta({
 
 const services = [
   {
-    title: "Personal Access",
-    description: "Instant access to clean, private restrooms for individuals and families on the go.",
+    title: "For Users",
+    description: "Find clean, accessible restrooms anywhere. Filter by amenities like wheelchair access, baby changing, and more.",
     icon: MapPin,
-    features: ["Real-time availability", "Hygiene ratings", "Instant booking", "Navigation assistance"]
+    features: ["Real-time availability", "Accessibility filters", "Instant booking", "Verified locations"]
   },
   {
-    title: "Business Solutions",
-    description: "Monetize underutilized facilities and drive foot traffic to your retail location.",
+    title: "For Providers",
+    description: "Turn your restroom into a revenue stream. Help your community while earning extra income.",
+    icon: Home,
+    features: ["Flexible scheduling", "Set your own rates", "Verified guests only", "Instant payouts"]
+  },
+  {
+    title: "For Businesses",
+    description: "Monetize underutilized facilities and drive foot traffic to your location.",
     icon: Building,
-    features: ["Revenue generation", "Foot traffic analytics", "Access control integration", "Automated payments"]
-  },
-  {
-    title: "Event Partnerships",
-    description: "Temporary restroom network solutions for festivals, parades, and city-wide events.",
-    icon: Zap,
-    features: ["Pop-up networks", "Crowd management", "VIP restroom access", "Logistics support"]
+    features: ["Increased visibility", "Customer analytics", "Access control", "Brand exposure"]
   }
+]
+
+const providerBenefits = [
+  { icon: DollarSign, title: "Earn Extra Income", description: "Set your own rates and availability. Earn $50-200+ per month." },
+  { icon: Calendar, title: "Flexible Schedule", description: "Control when your facility is available. Block dates anytime." },
+  { icon: ShieldCheck, title: "Protected & Insured", description: "All bookings include liability coverage and verified users." },
+  { icon: Users, title: "Help Your Community", description: "Serve parents, elderly, and those with medical needs." },
 ]
 </script>
 
@@ -64,6 +71,34 @@ const services = [
       </div>
     </section>
     
+    <!-- Provider Benefits Section -->
+    <section class="py-24 px-6 bg-gradient-to-b from-cyan-50 to-white">
+      <div class="container mx-auto max-w-6xl">
+        <div class="text-center max-w-3xl mx-auto mb-16">
+          <h2 class="text-3xl font-bold text-slate-900 mb-4">Why Become a Provider?</h2>
+          <p class="text-slate-600 text-lg">
+            Join thousands of homeowners and businesses earning extra income while helping their community.
+          </p>
+        </div>
+
+        <div class="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
+          <div v-for="benefit in providerBenefits" :key="benefit.title" class="bg-white p-6 rounded-xl shadow-sm border border-slate-100 text-center">
+            <div class="w-12 h-12 bg-cyan-100 rounded-full flex items-center justify-center mx-auto mb-4">
+              <component :is="benefit.icon" class="w-6 h-6 text-cyan-600" />
+            </div>
+            <h3 class="font-bold text-slate-900 mb-2">{{ benefit.title }}</h3>
+            <p class="text-sm text-slate-600">{{ benefit.description }}</p>
+          </div>
+        </div>
+
+        <div class="mt-12 text-center">
+          <Button size="lg" class="rounded-full px-8" @click="navigateTo('/register')">
+            Start Hosting Today
+          </Button>
+        </div>
+      </div>
+    </section>
+
     <section class="py-20 px-6">
        <div class="container mx-auto max-w-4xl text-center bg-slate-900 rounded-[2.5rem] p-12 md:p-20 relative overflow-hidden">
           <div class="absolute inset-0 bg-[url('/images/bathrooms/bathroom-blue.jpg')] opacity-10 bg-cover bg-center"></div>

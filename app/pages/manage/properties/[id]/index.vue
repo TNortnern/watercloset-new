@@ -11,123 +11,292 @@ import {
   Pause,
   Play,
   Save,
-  Upload,
-  X,
   Clock,
   User,
   TrendingUp
 } from 'lucide-vue-next'
+import { ImageUpload } from '@/components/ui/upload'
 
 definePageMeta({
   layout: 'dashboard-provider',
+  middleware: 'provider'
 })
 
 const route = useRoute()
-const propertyId = route.params.id
+const router = useRouter()
+const auth = useAuth()
+const payload = usePayload()
+const { toast } = useToast()
+const { confirm } = useConfirm()
+const propertyId = route.params.id as string
 
 const isEditing = ref(false)
 const activeTab = ref('overview')
+const isSaving = ref(false)
 
-// Mock property data
-const property = ref({
-  id: propertyId,
-  name: 'Downtown Luxury Suite',
-  description: 'A beautifully designed modern bathroom in the heart of downtown. Features premium amenities, excellent natural lighting, and a peaceful atmosphere perfect for a quick refresh or relaxation.',
-  type: 'private',
-  address: '123 Main Street',
-  city: 'New York',
-  state: 'NY',
-  zipCode: '10001',
-  price: 1.50,
-  minimumDuration: 15,
-  maximumDuration: 120,
-  rating: 4.9,
-  reviews: 42,
-  bookings: 128,
-  status: 'active',
-  instantBooking: true,
-  advanceNotice: 2,
-  images: [
-    'https://images.unsplash.com/photo-1552321554-5fefe8c9ef14?w=800&h=600&fit=crop',
-    'https://images.unsplash.com/photo-1620626011761-996317b8d101?w=800&h=600&fit=crop',
-    'https://images.unsplash.com/photo-1564540583246-934409427776?w=800&h=600&fit=crop',
-    'https://images.unsplash.com/photo-1507652313519-d4e9174996dd?w=800&h=600&fit=crop'
-  ],
-  amenities: ['WiFi', 'Shower', 'Toiletries', 'Hair Dryer', 'Towels', 'Air Conditioning', 'Premium Products'],
-  availableDays: ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday']
-})
-
-const recentBookings = [
-  {
-    id: 'BK-1001',
-    guest: { name: 'Sarah Johnson', avatar: 'SJ' },
-    date: '2025-12-18',
-    time: '14:30',
-    duration: 45,
-    amount: 67.50,
-    status: 'confirmed'
-  },
-  {
-    id: 'BK-1002',
-    guest: { name: 'Michael Chen', avatar: 'MC' },
-    date: '2025-12-17',
-    time: '10:15',
-    duration: 30,
-    amount: 45.00,
-    status: 'completed'
-  },
-  {
-    id: 'BK-1003',
-    guest: { name: 'Emily Rodriguez', avatar: 'ER' },
-    date: '2025-12-19',
-    time: '16:00',
-    duration: 60,
-    amount: 90.00,
-    status: 'confirmed'
-  }
-]
-
-const propertyReviews = [
-  {
-    id: 1,
-    guest: { name: 'Sarah Johnson', avatar: 'SJ' },
-    rating: 5,
-    comment: 'Absolutely amazing experience! The bathroom was spotless and beautifully designed.',
-    date: '2025-12-15',
-    helpful: 12
-  },
-  {
-    id: 2,
-    guest: { name: 'Michael Chen', avatar: 'MC' },
-    rating: 5,
-    comment: 'Perfect for a quick refresh during my busy day. Great location and very clean.',
-    date: '2025-12-14',
-    helpful: 8
-  },
-  {
-    id: 3,
-    guest: { name: 'Emily Rodriguez', avatar: 'ER' },
-    rating: 4,
-    comment: 'Really nice space with modern aesthetic. Everything was clean and functional.',
-    date: '2025-12-13',
-    helpful: 5
-  }
-]
-
-const stats = computed(() => ({
-  totalEarnings: property.value.bookings * property.value.price * 30,
-  avgDuration: 35,
-  occupancyRate: 68,
-  responseTime: '< 1 hour'
-}))
-
-const toggleStatus = () => {
-  property.value.status = property.value.status === 'active' ? 'inactive' : 'active'
+interface UploadedFile {
+  id?: string | number
+  url: string
+  alt?: string
+  filename?: string
 }
 
-const saveChanges = () => {
-  isEditing.value = false
-  // Save changes
+interface Property {
+  id: string
+  name: string
+  description: string
+  type: string
+  location: {
+    address: string
+    city: string
+    state: string
+    zipCode: string
+  }
+  pricePerMinute: number
+  minimumDuration: number
+  maximumDuration: number
+  status: string
+  availability?: {
+    instantBooking: boolean
+    advanceNotice: number
+    schedule?: { day: string, enabled: boolean }[]
+  }
+  photos?: { id: string, image: { id: string, url: string } }[]
+  amenities: string[]
+}
+
+interface Booking {
+  id: string
+  user: { id: string, firstName: string, lastName: string }
+  startTime: string
+  endTime: string
+  totalAmount: number
+  status: string
+}
+
+interface Review {
+  id: string
+  user: { id: string, firstName: string, lastName: string }
+  rating: number
+  comment: string
+  createdAt: string
+  helpful: number
+}
+
+// Fetch property data
+const { data: propertyData, refresh: refreshProperty } = await useAsyncData(`property-${propertyId}`, async () => {
+  return await payload.findByID<Property>('properties', propertyId, 1)
+})
+
+// Fetch bookings for this property
+const { data: bookingsData } = await useAsyncData(`property-bookings-${propertyId}`, async () => {
+  return await payload.find<Booking>('bookings', {
+    where: { property: { equals: propertyId } },
+    depth: 2,
+    limit: 50,
+    sort: '-createdAt'
+  })
+})
+
+// Fetch reviews for this property
+const { data: reviewsData } = await useAsyncData(`property-reviews-${propertyId}`, async () => {
+  return await payload.find<Review>('reviews', {
+    where: { property: { equals: propertyId } },
+    depth: 2,
+    limit: 100,
+    sort: '-createdAt'
+  })
+})
+
+// Reactive property ref for editing - convert price from cents to dollars
+const property = ref<Property>({
+  ...propertyData.value!,
+  pricePerMinute: propertyData.value!.pricePerMinute / 100
+})
+
+const photoUploads = ref<UploadedFile[]>([])
+
+const mapPropertyPhotos = (photos?: Property['photos']) => {
+  if (!photos) return []
+  return photos
+    .map(photo => {
+      if (!photo?.image?.url) return null
+      return {
+        id: photo.image.id,
+        url: photo.image.url,
+      }
+    })
+    .filter(Boolean) as UploadedFile[]
+}
+
+watch(
+  () => propertyData.value?.photos,
+  (photos) => {
+    if (isEditing.value) return
+    photoUploads.value = mapPropertyPhotos(photos)
+  },
+  { immediate: true }
+)
+
+watch(
+  () => propertyData.value,
+  (value) => {
+    if (!value || isEditing.value) return
+    property.value = {
+      ...value,
+      pricePerMinute: value.pricePerMinute / 100
+    }
+  },
+  { immediate: true }
+)
+
+const allBookings = computed(() => bookingsData.value?.docs || [])
+const allReviews = computed(() => reviewsData.value?.docs || [])
+
+// Transform bookings for display
+const recentBookings = computed(() => {
+  return allBookings.value.slice(0, 10).map(booking => {
+    const user = booking.user
+    const startTime = new Date(booking.startTime)
+    const endTime = new Date(booking.endTime)
+    const duration = Math.round((endTime.getTime() - startTime.getTime()) / (1000 * 60))
+
+    const firstName = typeof user === 'object' ? user.firstName : ''
+    const lastName = typeof user === 'object' ? user.lastName : ''
+
+    return {
+      id: booking.id,
+      guest: {
+        name: `${firstName} ${lastName}`.trim(),
+        avatar: `${firstName.charAt(0)}${lastName.charAt(0)}`.toUpperCase()
+      },
+      date: startTime.toISOString().split('T')[0],
+      time: startTime.toTimeString().slice(0, 5),
+      duration,
+      amount: booking.totalAmount / 100,
+      status: booking.status
+    }
+  })
+})
+
+// Transform reviews for display
+const propertyReviews = computed(() => {
+  return allReviews.value.map(review => {
+    const user = review.user
+    const firstName = typeof user === 'object' ? user.firstName : ''
+    const lastName = typeof user === 'object' ? user.lastName : ''
+    const createdAt = new Date(review.createdAt)
+
+    return {
+      id: review.id,
+      guest: {
+        name: `${firstName} ${lastName}`.trim(),
+        avatar: `${firstName.charAt(0)}${lastName.charAt(0)}`.toUpperCase()
+      },
+      rating: review.rating,
+      comment: review.comment,
+      date: createdAt.toISOString().split('T')[0],
+      helpful: review.helpful || 0
+    }
+  })
+})
+
+// Calculate stats
+const stats = computed(() => {
+  const completedBookings = allBookings.value.filter(b => b.status === 'completed')
+  const totalEarnings = completedBookings.reduce((sum, b) => sum + b.totalAmount, 0) / 100
+
+  let avgDuration = 0
+  if (completedBookings.length > 0) {
+    const totalDuration = completedBookings.reduce((sum, b) => {
+      const start = new Date(b.startTime)
+      const end = new Date(b.endTime)
+      return sum + (end.getTime() - start.getTime()) / (1000 * 60)
+    }, 0)
+    avgDuration = Math.round(totalDuration / completedBookings.length)
+  }
+
+  return {
+    totalEarnings,
+    avgDuration,
+    occupancyRate: 68,
+    responseTime: '< 1 hour'
+  }
+})
+
+const toggleStatus = async () => {
+  const newStatus = property.value.status === 'active' ? 'inactive' : 'active'
+  try {
+    await payload.update('properties', propertyId, { status: newStatus })
+    property.value.status = newStatus
+    await refreshProperty()
+    toast.success(`Property ${newStatus === 'active' ? 'activated' : 'deactivated'} successfully`)
+  } catch (error) {
+    console.error('Failed to update status:', error)
+    toast.error('Failed to update property status')
+  }
+}
+
+const saveChanges = async () => {
+  if (isSaving.value) return
+  isSaving.value = true
+
+  try {
+    const photoIds = photoUploads.value
+      .map(photo => photo.id)
+      .filter(Boolean) as Array<string | number>
+
+    if (photoIds.length === 0) {
+      toast.warning('Please keep at least one photo')
+      isSaving.value = false
+      return
+    }
+
+    await payload.update('properties', propertyId, {
+      name: property.value.name,
+      description: property.value.description,
+      pricePerMinute: Math.round(property.value.pricePerMinute * 100),
+      minimumDuration: property.value.minimumDuration,
+      maximumDuration: property.value.maximumDuration,
+      location: property.value.location,
+      amenities: property.value.amenities,
+      photos: photoIds.map(id => ({ image: id }))
+    })
+    property.value.photos = photoUploads.value
+      .filter(photo => photo.id && photo.url)
+      .map((photo, index) => ({
+        id: String(photo.id ?? index),
+        image: { id: String(photo.id), url: photo.url }
+      }))
+    await refreshProperty()
+    isEditing.value = false
+    toast.success('Changes saved successfully')
+  } catch (error) {
+    console.error('Failed to save changes:', error)
+    toast.error('Failed to save changes. Please try again.')
+  } finally {
+    isSaving.value = false
+  }
+}
+
+const deleteProperty = async () => {
+  const confirmed = await confirm({
+    title: 'Delete Property',
+    message: 'Are you sure you want to delete this property? This action cannot be undone.',
+    confirmText: 'Delete',
+    variant: 'destructive',
+  })
+
+  if (!confirmed) return
+
+  try {
+    await payload.remove('properties', propertyId)
+    toast.success('Property deleted successfully')
+    router.push('/manage/properties')
+  } catch (error) {
+    console.error('Failed to delete property:', error)
+    toast.error('Failed to delete property. Please try again.')
+  }
 }
 
 const getStatusColor = (status: string) => {
@@ -159,7 +328,7 @@ const renderStars = (rating: number) => {
           <h1 class="text-3xl font-bold text-gray-900">{{ property.name }}</h1>
           <p class="mt-1 text-gray-600 flex items-center gap-2">
             <MapPin class="w-4 h-4" />
-            {{ property.address }}, {{ property.city }}, {{ property.state }}
+            {{ property.location.address }}, {{ property.location.city }}, {{ property.location.state }}
           </p>
         </div>
       </div>
@@ -238,7 +407,7 @@ const renderStars = (rating: number) => {
           </div>
           <div class="text-sm text-gray-600">Total Bookings</div>
         </div>
-        <div class="text-2xl font-bold text-gray-900">{{ property.bookings }}</div>
+        <div class="text-2xl font-bold text-gray-900">{{ allBookings.length }}</div>
       </div>
 
       <div class="bg-white border border-gray-200 rounded-xl p-6">
@@ -249,8 +418,8 @@ const renderStars = (rating: number) => {
           <div class="text-sm text-gray-600">Rating</div>
         </div>
         <div class="flex items-center gap-2">
-          <div class="text-2xl font-bold text-gray-900">{{ property.rating }}</div>
-          <div class="text-sm text-gray-600">({{ property.reviews }} reviews)</div>
+          <div class="text-2xl font-bold text-gray-900">{{ allReviews.length > 0 ? (allReviews.reduce((sum, r) => sum + r.rating, 0) / allReviews.length).toFixed(1) : '0.0' }}</div>
+          <div class="text-sm text-gray-600">({{ allReviews.length }} reviews)</div>
         </div>
       </div>
 
@@ -302,7 +471,7 @@ const renderStars = (rating: number) => {
                 </div>
                 <div>
                   <label class="text-sm font-medium text-gray-600">Price per Minute</label>
-                  <p class="mt-1 text-gray-900">${{ property.price }}</p>
+                  <p class="mt-1 text-gray-900">${{ (property.pricePerMinute / 100).toFixed(2) }}</p>
                 </div>
                 <div>
                   <label class="text-sm font-medium text-gray-600">Minimum Duration</label>
@@ -333,9 +502,9 @@ const renderStars = (rating: number) => {
               </div>
               <div class="grid grid-cols-2 gap-4">
                 <div>
-                  <label class="block text-sm font-medium text-gray-700 mb-2">Price per Minute</label>
+                  <label class="block text-sm font-medium text-gray-700 mb-2">Price per Minute (in dollars)</label>
                   <input
-                    v-model="property.price"
+                    v-model.number="property.pricePerMinute"
                     type="number"
                     step="0.01"
                     class="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
@@ -370,8 +539,8 @@ const renderStars = (rating: number) => {
             <h3 class="text-lg font-semibold text-gray-900 mb-4">Location</h3>
             <div class="p-4 bg-gray-50 rounded-lg">
               <p class="text-gray-900">
-                {{ property.address }}<br>
-                {{ property.city }}, {{ property.state }} {{ property.zipCode }}
+                {{ property.location.address }}<br>
+                {{ property.location.city }}, {{ property.location.state }} {{ property.location.zipCode }}
               </p>
             </div>
           </div>
@@ -381,37 +550,30 @@ const renderStars = (rating: number) => {
         <div v-if="activeTab === 'photos'" class="space-y-6">
           <div class="flex items-center justify-between">
             <h3 class="text-lg font-semibold text-gray-900">Property Photos</h3>
-            <button
-              v-if="isEditing"
-              class="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 transition-colors"
-            >
-              <Upload class="w-4 h-4" />
-              Upload Photos
-            </button>
           </div>
-          <div class="grid grid-cols-2 md:grid-cols-3 gap-4">
+          <div v-if="isEditing" class="space-y-4">
+            <ImageUpload
+              v-model="photoUploads"
+              multiple
+              :max-files="10"
+              :allow-url="false"
+            />
+            <p class="text-sm text-gray-500">Upload at least one photo to keep your listing active.</p>
+          </div>
+          <div v-else class="grid grid-cols-2 md:grid-cols-3 gap-4">
             <div
-              v-for="(image, index) in property.images"
-              :key="index"
+              v-for="(photo, index) in property.photos"
+              :key="photo.id"
               class="group relative aspect-square rounded-xl overflow-hidden"
             >
-              <img :src="image" :alt="`Property photo ${index + 1}`" class="w-full h-full object-cover" />
-              <div
-                v-if="isEditing"
-                class="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center"
-              >
-                <button class="p-2 bg-red-600 text-white rounded-lg hover:bg-red-700">
-                  <X class="w-5 h-5" />
-                </button>
-              </div>
+              <img :src="photo.image.url" :alt="`Property photo ${index + 1}`" class="w-full h-full object-cover" />
             </div>
-            <button
-              v-if="isEditing"
-              class="aspect-square border-2 border-dashed border-gray-300 rounded-xl flex flex-col items-center justify-center text-gray-500 hover:border-gray-400 hover:text-gray-600 transition-colors"
+            <div
+              v-if="!property.photos || property.photos.length === 0"
+              class="aspect-square border-2 border-dashed border-gray-300 rounded-xl flex items-center justify-center text-gray-500"
             >
-              <Upload class="w-8 h-8 mb-2" />
-              <span class="text-sm">Add Photo</span>
-            </button>
+              No photos yet
+            </div>
           </div>
         </div>
 
@@ -451,7 +613,7 @@ const renderStars = (rating: number) => {
           <div class="flex items-center justify-between mb-6">
             <div>
               <h3 class="text-lg font-semibold text-gray-900">Guest Reviews</h3>
-              <p class="text-sm text-gray-600 mt-1">{{ property.reviews }} reviews with {{ property.rating }} average rating</p>
+              <p class="text-sm text-gray-600 mt-1">{{ allReviews.length }} reviews with {{ allReviews.length > 0 ? (allReviews.reduce((sum, r) => sum + r.rating, 0) / allReviews.length).toFixed(1) : '0.0' }} average rating</p>
             </div>
           </div>
           <div class="space-y-4">
@@ -502,7 +664,7 @@ const renderStars = (rating: number) => {
     <div class="bg-white border border-red-200 rounded-xl p-6">
       <h3 class="text-lg font-semibold text-red-900 mb-2">Danger Zone</h3>
       <p class="text-sm text-gray-600 mb-4">Irreversible actions for this property</p>
-      <button class="inline-flex items-center gap-2 px-4 py-2.5 bg-red-600 text-white font-medium rounded-lg hover:bg-red-700 transition-colors">
+      <button @click="deleteProperty" class="inline-flex items-center gap-2 px-4 py-2.5 bg-red-600 text-white font-medium rounded-lg hover:bg-red-700 transition-colors">
         <Trash2 class="w-4 h-4" />
         Delete Property
       </button>

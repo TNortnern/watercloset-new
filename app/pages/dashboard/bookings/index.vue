@@ -194,173 +194,178 @@ definePageMeta({
   layout: 'dashboard-user',
 })
 
+const { user } = useAuth()
+const payload = usePayload()
+const { toast } = useToast()
+const { confirm } = useConfirm()
+
 const activeTab = ref('upcoming')
 
-// Mock bookings data
-const bookings = ref([
-  {
-    id: 1001,
-    name: 'Luxury Downtown Restroom',
-    location: 'Manhattan, NY',
-    date: 'Dec 18, 2025',
-    time: '2:00 PM - 2:30 PM',
-    price: 15,
-    status: 'Confirmed',
-    host: 'John Smith',
-    rating: 4.9,
-    reviews: 127,
-    reviewed: false,
-    image: 'https://images.unsplash.com/photo-1552321554-5fefe8c9ef14?w=400&h=300&fit=crop',
+// Fetch all user bookings
+const { data: bookingsData, pending, refresh } = await useAsyncData(
+  'all-user-bookings',
+  async () => {
+    if (!user.value?.id) return null
+
+    return await payload.find('bookings', {
+      where: {
+        user: { equals: user.value.id },
+      },
+      depth: 1,
+      sort: '-startTime',
+      limit: 100,
+    })
   },
   {
-    id: 1002,
-    name: 'Cozy Cafe Bathroom',
-    location: 'Brooklyn, NY',
-    date: 'Dec 20, 2025',
-    time: '10:00 AM - 10:30 AM',
-    price: 8,
-    status: 'Confirmed',
-    host: 'Emma Wilson',
-    rating: 4.7,
-    reviews: 89,
-    reviewed: false,
-    image: 'https://images.unsplash.com/photo-1584622650111-993a426fbf0a?w=400&h=300&fit=crop',
+    watch: [() => user.value?.id],
+  }
+)
+
+// Fetch all user reviews to check which bookings have been reviewed
+const { data: reviewsData } = await useAsyncData(
+  'user-reviews',
+  async () => {
+    if (!user.value?.id) return null
+
+    try {
+      return await payload.find('reviews', {
+        where: {
+          user: { equals: user.value.id },
+        },
+        limit: 100,
+      })
+    } catch (error) {
+      console.error('Error fetching reviews:', error)
+      return null
+    }
   },
   {
-    id: 1003,
-    name: 'Modern Office Restroom',
-    location: 'Queens, NY',
-    date: 'Dec 15, 2025',
-    time: '4:00 PM - 4:30 PM',
-    price: 12,
-    status: 'Completed',
-    host: 'Michael Brown',
-    rating: 4.8,
-    reviews: 156,
-    reviewed: true,
-    image: 'https://images.unsplash.com/photo-1620626011761-996317b8d101?w=400&h=300&fit=crop',
-  },
-  {
-    id: 1004,
-    name: 'Premium Hotel Facilities',
-    location: 'Manhattan, NY',
-    date: 'Dec 10, 2025',
-    time: '1:00 PM - 1:30 PM',
-    price: 20,
-    status: 'Completed',
-    host: 'Sarah Davis',
-    rating: 5.0,
-    reviews: 203,
-    reviewed: false,
-    image: 'https://images.unsplash.com/photo-1578683010236-d716f9a3f461?w=400&h=300&fit=crop',
-  },
-  {
-    id: 1005,
-    name: 'Quiet Library Restroom',
-    location: 'Bronx, NY',
-    date: 'Dec 8, 2025',
-    time: '11:00 AM - 11:30 AM',
-    price: 6,
-    status: 'Cancelled',
-    host: 'David Lee',
-    rating: 4.6,
-    reviews: 74,
-    reviewed: false,
-    image: 'https://images.unsplash.com/photo-1585412727339-54e4bae3bbf9?w=400&h=300&fit=crop',
-  },
-  {
-    id: 1006,
-    name: 'Spa-Like Bathroom',
-    location: 'Manhattan, NY',
-    date: 'Dec 5, 2025',
-    time: '3:00 PM - 3:30 PM',
-    price: 18,
-    status: 'Completed',
-    host: 'Lisa Anderson',
-    rating: 4.9,
-    reviews: 142,
-    reviewed: true,
-    image: 'https://images.unsplash.com/photo-1507652313519-d4e9174996dd?w=400&h=300&fit=crop',
-  },
-  {
-    id: 1007,
-    name: 'Trendy Restaurant Restroom',
-    location: 'Brooklyn, NY',
-    date: 'Dec 22, 2025',
-    time: '7:00 PM - 7:30 PM',
-    price: 10,
-    status: 'Confirmed',
-    host: 'James Taylor',
-    rating: 4.5,
-    reviews: 91,
-    reviewed: false,
-    image: 'https://images.unsplash.com/photo-1556912167-f556f1f39faa?w=400&h=300&fit=crop',
-  },
-  {
-    id: 1008,
-    name: 'Elegant Boutique Restroom',
-    location: 'Manhattan, NY',
-    date: 'Dec 3, 2025',
-    time: '2:00 PM - 2:30 PM',
-    price: 14,
-    status: 'Cancelled',
-    host: 'Robert Chen',
-    rating: 4.7,
-    reviews: 98,
-    reviewed: false,
-    image: 'https://images.unsplash.com/photo-1600566752355-35792bedcfea?w=400&h=300&fit=crop',
-  },
-])
+    watch: [() => user.value?.id],
+  }
+)
+
+// Create a set of booking IDs that have been reviewed
+const reviewedBookingIds = computed(() => {
+  const ids = new Set<string>()
+  if (reviewsData.value?.docs) {
+    reviewsData.value.docs.forEach((review: any) => {
+      const bookingId = typeof review.booking === 'string' ? review.booking : review.booking?.id
+      if (bookingId) {
+        ids.add(bookingId)
+      }
+    })
+  }
+  return ids
+})
+
+// Transform bookings data for display
+const allBookings = computed(() => {
+  if (!bookingsData.value?.docs) return []
+
+  return bookingsData.value.docs.map((booking: any) => {
+    const property = booking.property
+    const startTime = new Date(booking.startTime)
+    const endTime = new Date(booking.endTime)
+    const now = new Date()
+
+    // Determine status for display
+    let displayStatus = 'Confirmed'
+    if (booking.status === 'cancelled') {
+      displayStatus = 'Cancelled'
+    } else if (endTime < now) {
+      displayStatus = 'Completed'
+    } else if (booking.status === 'confirmed') {
+      displayStatus = 'Confirmed'
+    }
+
+    // Get property owner info
+    const owner = property?.owner
+    const hostName = owner?.firstName && owner?.lastName
+      ? `${owner.firstName} ${owner.lastName}`
+      : 'Property Owner'
+
+    // Check if this booking has been reviewed
+    const hasBeenReviewed = reviewedBookingIds.value.has(booking.id)
+
+    return {
+      id: booking.id,
+      name: property?.name || 'Unknown Property',
+      location: property?.address?.city && property?.address?.state
+        ? `${property.address.city}, ${property.address.state}`
+        : 'Location not available',
+      date: startTime.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
+      time: `${startTime.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })} - ${endTime.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}`,
+      price: booking.totalPrice || 0,
+      status: displayStatus,
+      host: hostName,
+      rating: property?.averageRating || 0,
+      reviews: property?.reviewCount || 0,
+      reviewed: hasBeenReviewed,
+      image: property?.images?.[0]?.url || 'https://images.unsplash.com/photo-1552321554-5fefe8c9ef14?w=400&h=300&fit=crop',
+    }
+  })
+})
 
 // Computed counts
 const upcomingCount = computed(() =>
-  bookings.value.filter(b => b.status === 'Confirmed').length
+  allBookings.value.filter(b => b.status === 'Confirmed').length
 )
 
 const pastCount = computed(() =>
-  bookings.value.filter(b => b.status === 'Completed').length
+  allBookings.value.filter(b => b.status === 'Completed').length
 )
 
 const cancelledCount = computed(() =>
-  bookings.value.filter(b => b.status === 'Cancelled').length
+  allBookings.value.filter(b => b.status === 'Cancelled').length
 )
 
 // Filtered bookings
 const filteredBookings = computed(() => {
   if (activeTab.value === 'upcoming') {
-    return bookings.value.filter(b => b.status === 'Confirmed')
+    return allBookings.value.filter(b => b.status === 'Confirmed')
   } else if (activeTab.value === 'past') {
-    return bookings.value.filter(b => b.status === 'Completed')
+    return allBookings.value.filter(b => b.status === 'Completed')
   } else if (activeTab.value === 'cancelled') {
-    return bookings.value.filter(b => b.status === 'Cancelled')
+    return allBookings.value.filter(b => b.status === 'Cancelled')
   }
-  return bookings.value
+  return allBookings.value
 })
 
 // Actions
-const viewDetails = (id: number) => {
+const viewDetails = (id: string) => {
   navigateTo(`/dashboard/bookings/${id}`)
 }
 
-const leaveReview = (id: number) => {
-  alert(`Leave review for booking #${id}`)
+const leaveReview = (id: string) => {
+  navigateTo(`/dashboard/bookings/${id}#review`)
 }
 
-const cancelBooking = (id: number) => {
-  console.log('Cancel booking:', id)
-  // TODO: Implement cancel booking functionality
-  if (confirm('Are you sure you want to cancel this booking? This action cannot be undone.')) {
-    const booking = bookings.value.find(b => b.id === id)
-    if (booking) {
-      booking.status = 'Cancelled'
-    }
+const cancelBooking = async (id: string) => {
+  const confirmed = await confirm({
+    title: 'Cancel Booking',
+    message: 'Are you sure you want to cancel this booking? This action cannot be undone.',
+    confirmText: 'Cancel Booking',
+    variant: 'destructive',
+  })
+
+  if (!confirmed) return
+
+  try {
+    await payload.update('bookings', id, { status: 'cancelled' })
+    await refresh()
+    toast.success('Booking cancelled successfully')
+  } catch (error) {
+    console.error('Failed to cancel booking:', error)
+    toast.error('Failed to cancel booking. Please try again.')
   }
 }
 
-const bookAgain = (id: number) => {
-  const booking = bookings.value.find(b => b.id === id)
+const bookAgain = (id: string) => {
+  // Navigate to property page - we'll need to get the property ID from the booking
+  const booking = allBookings.value.find(b => b.id === id)
   if (booking) {
-    navigateTo(`/bathrooms/${id}`)
+    // For now, redirect to search page since we don't have property detail pages yet
+    navigateTo('/search')
   }
 }
 </script>

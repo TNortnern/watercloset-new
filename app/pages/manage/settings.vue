@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, onMounted } from 'vue'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -17,14 +17,39 @@ import {
   Upload,
   Trash2,
   Plus,
-  Check
+  Check,
+  ExternalLink,
+  AlertCircle,
+  Loader2,
+  CheckCircle2,
+  XCircle,
+  ArrowRight
 } from 'lucide-vue-next'
 
 definePageMeta({
   layout: 'dashboard-provider',
 })
 
+const route = useRoute()
+const { user } = useAuth()
+const stripe = useStripe()
+const payload = usePayload()
+const { toast } = useToast()
+
 const activeTab = ref('profile')
+const isSaving = ref(false)
+
+// Stripe Connect state
+const stripeLoading = ref(false)
+const stripeStatus = ref<{
+  hasAccount: boolean
+  accountId?: string
+  chargesEnabled?: boolean
+  payoutsEnabled?: boolean
+  detailsSubmitted?: boolean
+} | null>(null)
+const showStripeMessage = ref(false)
+const stripeMessageType = ref<'success' | 'error'>('success')
 
 const tabs = [
   { id: 'profile', label: 'Profile', icon: User },
@@ -35,36 +60,27 @@ const tabs = [
   { id: 'security', label: 'Security', icon: Shield },
 ]
 
-// Mock profile data
+// Profile data - initialized from user
 const profile = ref({
-  firstName: 'Michael',
-  lastName: 'Chen',
-  email: 'michael@provider.com',
-  phone: '+1 (555) 123-4567',
-  bio: 'Property owner with multiple clean and accessible bathroom facilities in the downtown area.',
+  firstName: '',
+  lastName: '',
+  email: '',
+  phone: '',
+  bio: '',
 })
 
-// Mock business data
+// Business data - from providerInfo
 const business = ref({
-  businessName: 'Chen Properties LLC',
-  businessType: 'LLC',
-  taxId: '**-***1234',
-  address: '123 Main Street',
-  city: 'New York',
-  state: 'NY',
-  zip: '10001',
+  businessName: '',
+  businessType: 'individual',
+  taxId: '',
+  address: '',
+  city: '',
+  state: '',
+  zip: '',
 })
 
-// Mock payout data
-const payout = ref({
-  bankName: 'Chase Bank',
-  accountType: 'Checking',
-  accountLast4: '4567',
-  routingLast4: '9012',
-  payoutSchedule: 'weekly',
-})
-
-// Mock notification settings
+// Notification settings
 const notifications = ref({
   newBooking: { email: true, sms: true },
   bookingCancelled: { email: true, sms: false },
@@ -74,7 +90,7 @@ const notifications = ref({
   promotional: { email: false, sms: false },
 })
 
-// Mock availability settings
+// Availability settings
 const availability = ref({
   defaultStartTime: '08:00',
   defaultEndTime: '22:00',
@@ -85,9 +101,147 @@ const availability = ref({
   advanceNotice: 30,
 })
 
-const handleSave = () => {
-  console.log('Saving settings...')
-  // Add save logic here
+// User initials for avatar
+const userInitials = computed(() => {
+  const first = user.value?.firstName?.[0] || ''
+  const last = user.value?.lastName?.[0] || ''
+  return `${first}${last}`.toUpperCase() || 'U'
+})
+
+// Initialize form data from user
+const initFormData = () => {
+  if (user.value) {
+    profile.value = {
+      firstName: user.value.firstName || '',
+      lastName: user.value.lastName || '',
+      email: user.value.email || '',
+      phone: user.value.phone || '',
+      bio: user.value.bio || '',
+    }
+
+    if (user.value.providerInfo) {
+      business.value = {
+        businessName: user.value.providerInfo.businessName || '',
+        businessType: user.value.providerInfo.businessType || 'individual',
+        taxId: '',
+        address: '',
+        city: '',
+        state: '',
+        zip: '',
+      }
+    }
+  }
+}
+
+// Watch for user changes
+watch(() => user.value, initFormData, { immediate: true })
+
+// Load Stripe Connect status on mount
+onMounted(async () => {
+  const router = useRouter()
+
+  // Check for tab query param
+  const tabParam = route.query.tab
+  if (tabParam && typeof tabParam === 'string') {
+    activeTab.value = tabParam
+  }
+
+  // Handle OAuth return
+  const stripeParam = route.query.stripe
+  if (stripeParam === 'complete') {
+    showStripeMessage.value = true
+    stripeMessageType.value = 'success'
+    activeTab.value = 'payouts'
+
+    // Remove query param but keep tab param if present
+    router.replace({ query: { tab: 'payouts' } })
+  } else if (stripeParam === 'refresh') {
+    showStripeMessage.value = true
+    stripeMessageType.value = 'error'
+    activeTab.value = 'payouts'
+
+    // Remove query param but keep tab param if present
+    router.replace({ query: { tab: 'payouts' } })
+  }
+
+  // Load Stripe status
+  await loadStripeStatus()
+})
+
+const loadStripeStatus = async () => {
+  try {
+    stripeLoading.value = true
+    stripeStatus.value = await stripe.getConnectAccountStatus()
+  } catch (error) {
+    console.error('Error loading Stripe status:', error)
+  } finally {
+    stripeLoading.value = false
+  }
+}
+
+const handleConnectStripe = async () => {
+  try {
+    stripeLoading.value = true
+    const { url } = await stripe.createConnectOnboardingLink()
+    window.location.href = url
+  } catch (error) {
+    console.error('Error creating onboarding link:', error)
+    stripeLoading.value = false
+  }
+}
+
+const handleOpenStripeDashboard = async () => {
+  try {
+    stripeLoading.value = true
+    const { url } = await stripe.createConnectLoginLink()
+    window.open(url, '_blank')
+  } catch (error) {
+    console.error('Error creating login link:', error)
+  } finally {
+    stripeLoading.value = false
+  }
+}
+
+const handleSave = async () => {
+  if (!user.value?.id) return
+
+  isSaving.value = true
+  try {
+    await payload.update('users', user.value.id, {
+      firstName: profile.value.firstName,
+      lastName: profile.value.lastName,
+      email: profile.value.email,
+      phone: profile.value.phone,
+      bio: profile.value.bio,
+      providerInfo: {
+        ...user.value.providerInfo,
+        businessName: business.value.businessName,
+        businessType: business.value.businessType,
+      },
+    })
+
+    // Update local user state
+    user.value = {
+      ...user.value,
+      firstName: profile.value.firstName,
+      lastName: profile.value.lastName,
+      email: profile.value.email,
+      phone: profile.value.phone,
+      bio: profile.value.bio,
+      providerInfo: {
+        ...user.value.providerInfo,
+        businessName: business.value.businessName,
+        businessType: business.value.businessType,
+      },
+    }
+
+    toast.success('Settings saved successfully!')
+  } catch (error) {
+    console.error('Failed to save settings:', error)
+    toast.error('Failed to save settings. Please try again.')
+  } finally {
+    isSaving.value = false
+  }
 }
 </script>
 
@@ -128,7 +282,7 @@ const handleSave = () => {
           <!-- Avatar -->
           <div class="flex items-center gap-6">
             <div class="w-24 h-24 rounded-full bg-primary/10 flex items-center justify-center text-primary text-2xl font-bold">
-              MC
+              {{ userInitials }}
             </div>
             <div class="space-y-2">
               <Button variant="outline" size="sm">
@@ -304,86 +458,226 @@ const handleSave = () => {
 
     <!-- Payout Settings Tab -->
     <div v-if="activeTab === 'payouts'" class="space-y-6">
-      <Card>
-        <CardHeader>
-          <CardTitle>Payout Method</CardTitle>
-          <CardDescription>Manage how you receive your earnings</CardDescription>
-        </CardHeader>
-        <CardContent class="space-y-6">
-          <!-- Current Bank Account -->
-          <div class="p-4 bg-slate-50 rounded-lg border border-slate-200">
-            <div class="flex items-center justify-between">
-              <div class="flex items-center gap-4">
-                <div class="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
-                  <CreditCard class="w-6 h-6 text-blue-600" />
-                </div>
-                <div>
-                  <p class="font-medium text-slate-900">{{ payout.bankName }}</p>
-                  <p class="text-sm text-slate-600">{{ payout.accountType }} •••• {{ payout.accountLast4 }}</p>
-                </div>
-              </div>
-              <div class="flex items-center gap-2">
-                <span class="px-2 py-1 bg-green-100 text-green-700 text-xs font-medium rounded-full flex items-center gap-1">
-                  <Check class="w-3 h-3" />
-                  Verified
-                </span>
-                <Button variant="outline" size="sm">Edit</Button>
-              </div>
-            </div>
+      <!-- Success/Error Messages -->
+      <div v-if="showStripeMessage" class="p-4 rounded-lg border" :class="stripeMessageType === 'success' ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'">
+        <div class="flex items-start gap-3">
+          <CheckCircle2 v-if="stripeMessageType === 'success'" class="w-5 h-5 text-green-600 mt-0.5" />
+          <XCircle v-else class="w-5 h-5 text-red-600 mt-0.5" />
+          <div class="flex-1">
+            <h3 class="font-medium" :class="stripeMessageType === 'success' ? 'text-green-900' : 'text-red-900'">
+              {{ stripeMessageType === 'success' ? 'Stripe Connected Successfully!' : 'Stripe Connection Failed' }}
+            </h3>
+            <p class="text-sm mt-1" :class="stripeMessageType === 'success' ? 'text-green-700' : 'text-red-700'">
+              {{ stripeMessageType === 'success'
+                ? 'Your Stripe account has been connected. You can now receive payments.'
+                : 'There was an issue connecting your Stripe account. Please try again.' }}
+            </p>
           </div>
+          <button @click="showStripeMessage = false" class="text-slate-400 hover:text-slate-600">
+            <XCircle class="w-5 h-5" />
+          </button>
+        </div>
+      </div>
 
-          <!-- Payout Schedule -->
-          <div class="space-y-3">
-            <Label>Payout Schedule</Label>
-            <div class="grid grid-cols-3 gap-3">
-              <button
-                v-for="schedule in ['daily', 'weekly', 'monthly']"
-                :key="schedule"
-                @click="payout.payoutSchedule = schedule"
-                class="p-4 rounded-lg border-2 transition-colors text-center"
-                :class="payout.payoutSchedule === schedule
-                  ? 'border-primary bg-primary/5'
-                  : 'border-slate-200 hover:border-slate-300'"
-              >
-                <p class="font-medium capitalize">{{ schedule }}</p>
-                <p class="text-xs text-slate-500 mt-1">
-                  {{ schedule === 'daily' ? 'Every business day' :
-                     schedule === 'weekly' ? 'Every Monday' :
-                     'First of month' }}
-                </p>
-              </button>
-            </div>
-          </div>
-
-          <div class="flex justify-end">
-            <Button @click="handleSave">
-              <Save class="w-4 h-4 mr-2" />
-              Save Changes
-            </Button>
+      <!-- Loading State -->
+      <Card v-if="stripeLoading && !stripeStatus">
+        <CardContent class="py-12">
+          <div class="flex flex-col items-center justify-center gap-3">
+            <Loader2 class="w-8 h-8 text-primary animate-spin" />
+            <p class="text-sm text-slate-600">Loading Stripe status...</p>
           </div>
         </CardContent>
       </Card>
 
-      <!-- Payout History -->
-      <Card>
+      <!-- Not Connected State -->
+      <Card v-else-if="!stripeStatus?.hasAccount">
         <CardHeader>
-          <CardTitle>Recent Payouts</CardTitle>
+          <CardTitle>Connect with Stripe</CardTitle>
+          <CardDescription>Start receiving payments from your bookings</CardDescription>
         </CardHeader>
-        <CardContent>
-          <div class="space-y-3">
-            <div v-for="i in 3" :key="i" class="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
-              <div>
-                <p class="font-medium text-slate-900">${{ (Math.random() * 500 + 100).toFixed(2) }}</p>
-                <p class="text-sm text-slate-500">{{ new Date(Date.now() - i * 7 * 24 * 60 * 60 * 1000).toLocaleDateString() }}</p>
+        <CardContent class="space-y-6">
+          <div class="p-6 bg-slate-50 rounded-lg border border-slate-200">
+            <div class="flex items-start gap-4">
+              <div class="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                <CreditCard class="w-6 h-6 text-blue-600" />
               </div>
-              <span class="px-2 py-1 bg-green-100 text-green-700 text-xs font-medium rounded-full">Completed</span>
+              <div class="flex-1">
+                <h4 class="font-medium text-slate-900 mb-2">Why connect Stripe?</h4>
+                <ul class="space-y-2 text-sm text-slate-600">
+                  <li class="flex items-start gap-2">
+                    <Check class="w-4 h-4 text-green-600 mt-0.5 flex-shrink-0" />
+                    <span>Receive payments directly to your bank account</span>
+                  </li>
+                  <li class="flex items-start gap-2">
+                    <Check class="w-4 h-4 text-green-600 mt-0.5 flex-shrink-0" />
+                    <span>Automatic payouts on your schedule</span>
+                  </li>
+                  <li class="flex items-start gap-2">
+                    <Check class="w-4 h-4 text-green-600 mt-0.5 flex-shrink-0" />
+                    <span>Secure and PCI-compliant processing</span>
+                  </li>
+                  <li class="flex items-start gap-2">
+                    <Check class="w-4 h-4 text-green-600 mt-0.5 flex-shrink-0" />
+                    <span>Track your earnings in real-time</span>
+                  </li>
+                </ul>
+              </div>
             </div>
           </div>
-          <Button variant="link" class="mt-4 p-0" @click="navigateTo('/manage/earnings')">
-            View all payouts →
+
+          <div class="p-4 bg-blue-50 rounded-lg border border-blue-200">
+            <div class="flex items-start gap-3">
+              <AlertCircle class="w-5 h-5 text-blue-600 mt-0.5 flex-shrink-0" />
+              <div class="text-sm text-blue-900">
+                <p class="font-medium mb-1">Quick setup in just a few minutes</p>
+                <p class="text-blue-700">You'll be redirected to Stripe to securely connect your bank account and verify your identity.</p>
+              </div>
+            </div>
+          </div>
+
+          <Button @click="handleConnectStripe" :disabled="stripeLoading" class="w-full" size="lg">
+            <Loader2 v-if="stripeLoading" class="w-5 h-5 mr-2 animate-spin" />
+            <CreditCard v-else class="w-5 h-5 mr-2" />
+            Connect with Stripe
           </Button>
         </CardContent>
       </Card>
+
+      <!-- Connected State -->
+      <template v-else>
+        <!-- Account Status Card -->
+        <Card>
+          <CardHeader>
+            <CardTitle>Stripe Account Status</CardTitle>
+            <CardDescription>Your payout account information</CardDescription>
+          </CardHeader>
+          <CardContent class="space-y-6">
+            <!-- Status Overview -->
+            <div class="grid md:grid-cols-2 gap-4">
+              <div class="p-4 bg-slate-50 rounded-lg border" :class="stripeStatus.detailsSubmitted ? 'border-green-200 bg-green-50' : 'border-yellow-200 bg-yellow-50'">
+                <div class="flex items-center justify-between mb-2">
+                  <span class="text-sm font-medium text-slate-700">Onboarding Status</span>
+                  <CheckCircle2 v-if="stripeStatus.detailsSubmitted" class="w-5 h-5 text-green-600" />
+                  <AlertCircle v-else class="w-5 h-5 text-yellow-600" />
+                </div>
+                <p class="text-lg font-semibold" :class="stripeStatus.detailsSubmitted ? 'text-green-900' : 'text-yellow-900'">
+                  {{ stripeStatus.detailsSubmitted ? 'Complete' : 'Incomplete' }}
+                </p>
+                <p v-if="!stripeStatus.detailsSubmitted" class="text-xs text-yellow-700 mt-1">
+                  Complete your setup to start receiving payments
+                </p>
+              </div>
+
+              <div class="p-4 bg-slate-50 rounded-lg border" :class="stripeStatus.chargesEnabled ? 'border-green-200 bg-green-50' : 'border-slate-200'">
+                <div class="flex items-center justify-between mb-2">
+                  <span class="text-sm font-medium text-slate-700">Charges Enabled</span>
+                  <CheckCircle2 v-if="stripeStatus.chargesEnabled" class="w-5 h-5 text-green-600" />
+                  <XCircle v-else class="w-5 h-5 text-slate-400" />
+                </div>
+                <p class="text-lg font-semibold" :class="stripeStatus.chargesEnabled ? 'text-green-900' : 'text-slate-900'">
+                  {{ stripeStatus.chargesEnabled ? 'Active' : 'Inactive' }}
+                </p>
+              </div>
+
+              <div class="p-4 bg-slate-50 rounded-lg border" :class="stripeStatus.payoutsEnabled ? 'border-green-200 bg-green-50' : 'border-slate-200'">
+                <div class="flex items-center justify-between mb-2">
+                  <span class="text-sm font-medium text-slate-700">Payouts Enabled</span>
+                  <CheckCircle2 v-if="stripeStatus.payoutsEnabled" class="w-5 h-5 text-green-600" />
+                  <XCircle v-else class="w-5 h-5 text-slate-400" />
+                </div>
+                <p class="text-lg font-semibold" :class="stripeStatus.payoutsEnabled ? 'text-green-900' : 'text-slate-900'">
+                  {{ stripeStatus.payoutsEnabled ? 'Active' : 'Inactive' }}
+                </p>
+              </div>
+
+              <div class="p-4 bg-slate-50 rounded-lg border border-slate-200">
+                <div class="flex items-center justify-between mb-2">
+                  <span class="text-sm font-medium text-slate-700">Account ID</span>
+                </div>
+                <p class="text-sm font-mono text-slate-600 truncate">
+                  {{ stripeStatus.accountId }}
+                </p>
+              </div>
+            </div>
+
+            <!-- Warning if incomplete -->
+            <div v-if="!stripeStatus.detailsSubmitted" class="p-4 bg-yellow-50 rounded-lg border border-yellow-200">
+              <div class="flex items-start gap-3">
+                <AlertCircle class="w-5 h-5 text-yellow-600 mt-0.5 flex-shrink-0" />
+                <div class="flex-1">
+                  <h4 class="font-medium text-yellow-900 mb-1">Complete your Stripe setup</h4>
+                  <p class="text-sm text-yellow-700 mb-3">
+                    Your Stripe account is not fully set up yet. Complete the onboarding process to start receiving payments.
+                  </p>
+                  <Button @click="handleConnectStripe" :disabled="stripeLoading" size="sm" variant="outline" class="border-yellow-300">
+                    <Loader2 v-if="stripeLoading" class="w-4 h-4 mr-2 animate-spin" />
+                    Complete Setup
+                  </Button>
+                </div>
+              </div>
+            </div>
+
+            <!-- Actions -->
+            <div class="flex flex-col sm:flex-row gap-3">
+              <Button @click="handleOpenStripeDashboard" :disabled="stripeLoading" variant="outline" class="flex-1">
+                <Loader2 v-if="stripeLoading" class="w-4 h-4 mr-2 animate-spin" />
+                <ExternalLink v-else class="w-4 h-4 mr-2" />
+                Open Stripe Dashboard
+              </Button>
+              <Button @click="loadStripeStatus" :disabled="stripeLoading" variant="outline">
+                <Loader2 v-if="stripeLoading" class="w-4 h-4 mr-2 animate-spin" />
+                Refresh Status
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+
+        <!-- Payout Information -->
+        <Card>
+          <CardHeader>
+            <CardTitle>Payout Information</CardTitle>
+            <CardDescription>Manage your payout settings in Stripe Dashboard</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div class="p-4 bg-slate-50 rounded-lg border border-slate-200">
+              <div class="flex items-start gap-3">
+                <div class="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                  <DollarSign class="w-5 h-5 text-blue-600" />
+                </div>
+                <div class="flex-1">
+                  <p class="font-medium text-slate-900 mb-1">Bank Account & Payout Schedule</p>
+                  <p class="text-sm text-slate-600 mb-3">
+                    Your bank account details and payout schedule are managed through your Stripe Dashboard for security.
+                  </p>
+                  <Button @click="handleOpenStripeDashboard" :disabled="stripeLoading" size="sm" variant="link" class="p-0 h-auto">
+                    Manage in Stripe Dashboard
+                    <ExternalLink class="w-3 h-3 ml-1" />
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <!-- Earnings Link -->
+        <Card>
+          <CardHeader>
+            <CardTitle>View Your Earnings</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div class="flex items-center justify-between p-4 bg-slate-50 rounded-lg">
+              <div>
+                <p class="font-medium text-slate-900">Track your earnings and payouts</p>
+                <p class="text-sm text-slate-500">View detailed breakdown of your booking revenue</p>
+              </div>
+              <Button @click="navigateTo('/manage/earnings')" variant="outline">
+                View Earnings
+                <ArrowRight class="w-4 h-4 ml-2" />
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      </template>
     </div>
 
     <!-- Default Availability Tab -->

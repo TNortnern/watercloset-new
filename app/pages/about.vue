@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Users, Target, Heart, Shield } from 'lucide-vue-next'
+import { Users, Target, Heart, Shield, Accessibility, Home, DollarSign, MapPin } from 'lucide-vue-next'
 import { Button } from '@/components/ui/button'
 
 definePageMeta({
@@ -29,25 +29,32 @@ const team = [
 
 const values = [
   {
-    icon: Users,
-    title: "Community First",
-    description: "We believe in the power of sharing resources to build stronger, more connected communities."
+    icon: Accessibility,
+    title: "Universal Accessibility",
+    description: "We champion wheelchair-accessible facilities, baby changing stations, and gender-neutral options for everyone."
   },
   {
-    icon: Target,
-    title: "Accessibility",
-    description: "Everyone deserves safe, dignified access to restroom facilities, regardless of ability or background."
+    icon: Home,
+    title: "Provider Empowerment",
+    description: "We help homeowners and businesses monetize their facilities while serving their community."
   },
   {
     icon: Shield,
     title: "Trust & Safety",
-    description: "We rigorously vet providers and maintain high standards to ensure every visit is safe."
+    description: "Every provider is verified and every facility is rated, ensuring safe and reliable experiences."
   },
   {
     icon: Heart,
-    title: "Dignity",
-    description: "We treat the need for a restroom as a basic human right, not an awkward inconvenience."
+    title: "Dignity for All",
+    description: "From medical conditions to mobility challenges, we believe restroom access is a basic human right."
   }
+]
+
+const accessibilityFeatures = [
+  { title: "Wheelchair Access", description: "Facilities with wide doorways, grab bars, and roll-in access" },
+  { title: "Baby Changing", description: "Safe, clean changing stations for parents on the go" },
+  { title: "Gender Neutral", description: "Private facilities welcoming to all gender identities" },
+  { title: "Medical Needs", description: "Discreet access for those with medical conditions like IBD, Crohn's, or pregnancy" },
 ]
 </script>
 
@@ -96,13 +103,40 @@ const values = [
           <h2 class="text-3xl font-bold text-slate-900 mb-4">Core Values</h2>
           <p class="text-slate-600">The principles that guide every decision we make.</p>
         </div>
-        
+
         <div class="grid md:grid-cols-2 lg:grid-cols-4 gap-8">
           <div v-for="value in values" :key="value.title" class="bg-slate-50 p-8 rounded-2xl border border-slate-100 hover:shadow-lg transition-shadow">
             <component :is="value.icon" class="w-12 h-12 text-primary mb-6" />
             <h3 class="text-xl font-bold text-slate-900 mb-3">{{ value.title }}</h3>
             <p class="text-slate-600 leading-relaxed">{{ value.description }}</p>
           </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Accessibility Focus Section -->
+    <section class="py-24 px-6 bg-gradient-to-b from-cyan-50 to-white">
+      <div class="container mx-auto max-w-6xl">
+        <div class="text-center max-w-3xl mx-auto mb-16">
+          <h2 class="text-3xl font-bold text-slate-900 mb-4">Accessibility First</h2>
+          <p class="text-slate-600 text-lg">
+            We're committed to making restroom access inclusive. Every facility on our platform can be filtered by accessibility features.
+          </p>
+        </div>
+
+        <div class="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
+          <div v-for="feature in accessibilityFeatures" :key="feature.title" class="bg-white p-6 rounded-xl shadow-sm border border-slate-100">
+            <Accessibility class="w-8 h-8 text-cyan-600 mb-4" />
+            <h3 class="font-bold text-slate-900 mb-2">{{ feature.title }}</h3>
+            <p class="text-sm text-slate-600">{{ feature.description }}</p>
+          </div>
+        </div>
+
+        <div class="mt-12 text-center">
+          <p class="text-slate-600 mb-4">Are you a provider with accessible facilities?</p>
+          <Button size="lg" class="rounded-full px-8" @click="navigateTo('/register')">
+            List Your Space
+          </Button>
         </div>
       </div>
     </section>

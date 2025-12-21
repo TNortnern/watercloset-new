@@ -14,9 +14,13 @@ export const Users: CollectionConfig = {
   },
   access: {
     read: ({ req: { user } }) => {
-      if (!user) return false
-      if (user.role === 'admin') return true
-      return { id: { equals: user.id } }
+      if (user?.role === 'admin') return true
+      const publicRoles = [
+        { role: { equals: 'provider' } },
+        { role: { equals: 'admin' } },
+      ]
+      if (!user) return { or: publicRoles }
+      return { or: [{ id: { equals: user.id } }, ...publicRoles] }
     },
     create: () => true, // Anyone can register
     update: ({ req: { user } }) => {
@@ -25,6 +29,29 @@ export const Users: CollectionConfig = {
       return { id: { equals: user.id } }
     },
     delete: ({ req: { user } }) => user?.role === 'admin',
+  },
+  hooks: {
+    afterRead: [
+      ({ req, doc }) => {
+        if (!doc) return doc
+        if (req.user?.role === 'admin' || req.user?.id === doc.id) return doc
+
+        const publicDoc: Record<string, any> = {
+          id: doc.id,
+          firstName: doc.firstName,
+          lastName: doc.lastName,
+          createdAt: doc.createdAt,
+          updatedAt: doc.updatedAt,
+          avatar: doc.avatar,
+        }
+
+        if (doc.providerInfo?.businessName) {
+          publicDoc.providerInfo = { businessName: doc.providerInfo.businessName }
+        }
+
+        return publicDoc
+      },
+    ],
   },
   fields: [
     {
@@ -56,9 +83,19 @@ export const Users: CollectionConfig = {
       type: 'text',
     },
     {
+      name: 'bio',
+      type: 'textarea',
+    },
+    {
       name: 'avatar',
       type: 'upload',
       relationTo: 'media',
+    },
+    {
+      name: 'favorites',
+      type: 'relationship',
+      relationTo: 'properties',
+      hasMany: true,
     },
     // Provider-specific fields
     {

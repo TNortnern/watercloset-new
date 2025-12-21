@@ -7,7 +7,8 @@
     "build": "next build",
     "start": "next start -p 3001",
     "generate:types": "payload generate:types",
-    "seed": "tsx src/seed.ts"
+    "seed": "tsx src/seed.ts",
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@payloadcms/db-postgres": "^3.0.0",

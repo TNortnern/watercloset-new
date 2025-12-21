@@ -68,16 +68,16 @@
         <p class="text-2xl font-bold text-gray-900 mt-1">{{ users.length }}</p>
       </div>
       <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
-        <p class="text-sm text-gray-600">Active</p>
-        <p class="text-2xl font-bold text-green-600 mt-1">{{ users.filter(u => u.status === 'active').length }}</p>
-      </div>
-      <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
-        <p class="text-sm text-gray-600">Suspended</p>
-        <p class="text-2xl font-bold text-red-600 mt-1">{{ users.filter(u => u.status === 'suspended').length }}</p>
+        <p class="text-sm text-gray-600">Regular Users</p>
+        <p class="text-2xl font-bold text-blue-600 mt-1">{{ users.filter(u => u.role === 'user').length }}</p>
       </div>
       <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
         <p class="text-sm text-gray-600">Providers</p>
         <p class="text-2xl font-bold text-purple-600 mt-1">{{ users.filter(u => u.role === 'provider').length }}</p>
+      </div>
+      <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
+        <p class="text-sm text-gray-600">Admins</p>
+        <p class="text-2xl font-bold text-red-600 mt-1">{{ users.filter(u => u.role === 'admin').length }}</p>
       </div>
     </div>
 
@@ -101,10 +101,10 @@
               <td class="px-6 py-4 whitespace-nowrap">
                 <div class="flex items-center">
                   <div class="h-10 w-10 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white font-semibold">
-                    {{ user.initials }}
+                    {{ getUserInitials(user) }}
                   </div>
                   <div class="ml-4">
-                    <div class="text-sm font-medium text-gray-900">{{ user.name }}</div>
+                    <div class="text-sm font-medium text-gray-900">{{ getUserName(user) }}</div>
                   </div>
                 </div>
               </td>
@@ -128,19 +128,15 @@
                 </select>
               </td>
               <td class="px-6 py-4 whitespace-nowrap">
-                <span :class="[
-                  'px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full',
-                  user.status === 'active' && 'bg-green-100 text-green-800',
-                  user.status === 'suspended' && 'bg-red-100 text-red-800'
-                ]">
-                  {{ user.status.charAt(0).toUpperCase() + user.status.slice(1) }}
+                <span class="px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">
+                  Active
                 </span>
               </td>
               <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                {{ user.joinedDate }}
+                {{ formatDate(user.createdAt) }}
               </td>
               <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                {{ user.bookingsCount }}
+                {{ bookingCounts[user.id] || 0 }}
               </td>
               <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                 <div class="flex items-center justify-end space-x-2">
@@ -152,16 +148,10 @@
                   </button>
                   <button
                     @click="toggleUserStatus(user.id)"
-                    :class="[
-                      'p-2 rounded-lg transition-colors',
-                      user.status === 'active'
-                        ? 'text-red-600 hover:bg-red-50'
-                        : 'text-green-600 hover:bg-green-50'
-                    ]"
-                    :title="user.status === 'active' ? 'Suspend' : 'Activate'"
+                    class="p-2 rounded-lg transition-colors text-red-600 hover:bg-red-50"
+                    title="Suspend"
                   >
-                    <Ban v-if="user.status === 'active'" class="w-4 h-4" />
-                    <Check v-else class="w-4 h-4" />
+                    <Ban class="w-4 h-4" />
                   </button>
                 </div>
               </td>
@@ -197,11 +187,27 @@ import { Users, UserPlus, Search, Eye, Edit, Ban, Check, ChevronLeft, ChevronRig
 
 definePageMeta({
   layout: 'dashboard-admin',
+  middleware: 'admin',
 })
+
+const payload = usePayload()
+const { toast } = useToast()
+
+interface User {
+  id: string
+  email: string
+  firstName: string
+  lastName: string
+  role: 'user' | 'provider' | 'admin'
+  createdAt: string
+}
 
 const searchQuery = ref('')
 const selectedRole = ref('all')
 const selectedStatus = ref('all')
+const loading = ref(true)
+const users = ref<User[]>([])
+const bookingCounts = ref<Record<string, number>>({})
 
 const roles = [
   { label: 'All Roles', value: 'all' },
@@ -216,152 +222,88 @@ const statuses = [
   { label: 'Suspended', value: 'suspended' }
 ]
 
-const users = [
-  {
-    id: 1,
-    name: 'Sarah Johnson',
-    initials: 'SJ',
-    email: 'sarah.johnson@example.com',
-    role: 'user',
-    joinedDate: 'Dec 15, 2024',
-    status: 'active',
-    bookingsCount: 12
-  },
-  {
-    id: 2,
-    name: 'Michael Chen',
-    initials: 'MC',
-    email: 'michael.chen@example.com',
-    role: 'provider',
-    joinedDate: 'Dec 10, 2024',
-    status: 'active',
-    bookingsCount: 45
-  },
-  {
-    id: 3,
-    name: 'Emma Davis',
-    initials: 'ED',
-    email: 'emma.davis@example.com',
-    role: 'user',
-    joinedDate: 'Dec 5, 2024',
-    status: 'suspended',
-    bookingsCount: 8
-  },
-  {
-    id: 4,
-    name: 'David Wilson',
-    initials: 'DW',
-    email: 'david.wilson@example.com',
-    role: 'admin',
-    joinedDate: 'Nov 28, 2024',
-    status: 'active',
-    bookingsCount: 2
-  },
-  {
-    id: 5,
-    name: 'Jessica Martinez',
-    initials: 'JM',
-    email: 'jessica.martinez@example.com',
-    role: 'provider',
-    joinedDate: 'Nov 20, 2024',
-    status: 'active',
-    bookingsCount: 38
-  },
-  {
-    id: 6,
-    name: 'Ryan Thompson',
-    initials: 'RT',
-    email: 'ryan.thompson@example.com',
-    role: 'user',
-    joinedDate: 'Nov 15, 2024',
-    status: 'active',
-    bookingsCount: 15
-  },
-  {
-    id: 7,
-    name: 'Ashley Brown',
-    initials: 'AB',
-    email: 'ashley.brown@example.com',
-    role: 'provider',
-    joinedDate: 'Nov 10, 2024',
-    status: 'active',
-    bookingsCount: 52
-  },
-  {
-    id: 8,
-    name: 'James Anderson',
-    initials: 'JA',
-    email: 'james.anderson@example.com',
-    role: 'user',
-    joinedDate: 'Nov 5, 2024',
-    status: 'active',
-    bookingsCount: 7
-  },
-  {
-    id: 9,
-    name: 'Olivia Garcia',
-    initials: 'OG',
-    email: 'olivia.garcia@example.com',
-    role: 'user',
-    joinedDate: 'Oct 30, 2024',
-    status: 'suspended',
-    bookingsCount: 3
-  },
-  {
-    id: 10,
-    name: 'Daniel Lee',
-    initials: 'DL',
-    email: 'daniel.lee@example.com',
-    role: 'provider',
-    joinedDate: 'Oct 25, 2024',
-    status: 'active',
-    bookingsCount: 41
-  },
-  {
-    id: 11,
-    name: 'Sophia Taylor',
-    initials: 'ST',
-    email: 'sophia.taylor@example.com',
-    role: 'user',
-    joinedDate: 'Oct 20, 2024',
-    status: 'active',
-    bookingsCount: 19
-  },
-  {
-    id: 12,
-    name: 'Matthew White',
-    initials: 'MW',
-    email: 'matthew.white@example.com',
-    role: 'user',
-    joinedDate: 'Oct 15, 2024',
-    status: 'active',
-    bookingsCount: 23
+// Fetch users on mount
+onMounted(async () => {
+  await fetchUsers()
+})
+
+async function fetchUsers() {
+  try {
+    loading.value = true
+    const response = await payload.find<User>('users', {
+      limit: 1000,
+      sort: '-createdAt'
+    })
+    users.value = response.docs
+
+    // Fetch booking counts for each user
+    const bookingsResponse = await payload.find('bookings', {
+      limit: 1000
+    })
+
+    const counts: Record<string, number> = {}
+    bookingsResponse.docs.forEach((booking: any) => {
+      const userId = typeof booking.user === 'string' ? booking.user : booking.user?.id
+      if (userId) {
+        counts[userId] = (counts[userId] || 0) + 1
+      }
+    })
+    bookingCounts.value = counts
+  } catch (error) {
+    console.error('Failed to fetch users:', error)
+  } finally {
+    loading.value = false
   }
-]
+}
 
 const filteredUsers = computed(() => {
-  return users.filter(user => {
+  return users.value.filter(user => {
     const matchesRole = selectedRole.value === 'all' || user.role === selectedRole.value
-    const matchesStatus = selectedStatus.value === 'all' || user.status === selectedStatus.value
     const matchesSearch = !searchQuery.value ||
-      user.name.toLowerCase().includes(searchQuery.value.toLowerCase()) ||
+      user.firstName?.toLowerCase().includes(searchQuery.value.toLowerCase()) ||
+      user.lastName?.toLowerCase().includes(searchQuery.value.toLowerCase()) ||
       user.email.toLowerCase().includes(searchQuery.value.toLowerCase())
-    return matchesRole && matchesStatus && matchesSearch
+    return matchesRole && matchesSearch
   })
 })
 
-const changeUserRole = (userId: number, newRole: string) => {
-  console.log(`Changing user ${userId} role to ${newRole}`)
-  // In a real app, this would make an API call
+function getUserInitials(user: User): string {
+  const first = user.firstName?.[0] || ''
+  const last = user.lastName?.[0] || ''
+  return `${first}${last}`.toUpperCase()
 }
 
-const editUser = (userId: number) => {
-  console.log(`Editing user ${userId}`)
-  // In a real app, this would open an edit modal or navigate to edit page
+function getUserName(user: User): string {
+  return `${user.firstName || ''} ${user.lastName || ''}`.trim() || user.email
 }
 
-const toggleUserStatus = (userId: number) => {
+function formatDate(dateString: string): string {
+  const date = new Date(dateString)
+  return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+}
+
+async function changeUserRole(userId: string, newRole: string) {
+  try {
+    await payload.update('users', userId, { role: newRole })
+    // Update local state
+    const user = users.value.find(u => u.id === userId)
+    if (user) {
+      user.role = newRole as 'user' | 'provider' | 'admin'
+    }
+    toast.success('User role updated')
+  } catch (error) {
+    console.error('Failed to update user role:', error)
+    toast.error('Failed to update user role')
+  }
+}
+
+const editUser = (userId: string) => {
+  navigateTo(`/admin/users/${userId}`)
+}
+
+const toggleUserStatus = (userId: string) => {
   console.log(`Toggling status for user ${userId}`)
-  // In a real app, this would make an API call
+  // TODO: Implement user suspension when backend supports it
+  toast.info('User suspension feature coming soon')
 }
 </script>

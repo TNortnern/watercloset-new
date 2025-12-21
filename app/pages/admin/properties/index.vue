@@ -99,19 +99,19 @@
                 </div>
               </td>
               <td class="px-6 py-4 whitespace-nowrap">
-                <div class="text-sm text-gray-900">{{ property.owner }}</div>
-                <div class="text-xs text-gray-500">{{ property.ownerEmail }}</div>
+                <div class="text-sm text-gray-900">{{ getOwnerName(property) }}</div>
+                <div class="text-xs text-gray-500">{{ getOwnerEmail(property) }}</div>
               </td>
               <td class="px-6 py-4 whitespace-nowrap">
-                <div class="text-sm text-gray-900">{{ property.location }}</div>
+                <div class="text-sm text-gray-900">{{ getPropertyLocation(property) }}</div>
               </td>
               <td class="px-6 py-4 whitespace-nowrap">
                 <span :class="[
                   'px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full',
-                  property.status === 'approved' && 'bg-green-100 text-green-800',
+                  property.status === 'active' && 'bg-green-100 text-green-800',
                   property.status === 'pending' && 'bg-orange-100 text-orange-800',
                   property.status === 'suspended' && 'bg-red-100 text-red-800',
-                  property.status === 'rejected' && 'bg-gray-100 text-gray-800'
+                  property.status === 'inactive' && 'bg-gray-100 text-gray-800'
                 ]">
                   {{ property.status.charAt(0).toUpperCase() + property.status.slice(1) }}
                 </span>
@@ -119,12 +119,12 @@
               <td class="px-6 py-4 whitespace-nowrap">
                 <div class="flex items-center">
                   <Star class="w-4 h-4 text-yellow-500 fill-yellow-500 mr-1" />
-                  <span class="text-sm font-medium text-gray-900">{{ property.rating }}</span>
-                  <span class="text-xs text-gray-500 ml-1">({{ property.reviews }})</span>
+                  <span class="text-sm font-medium text-gray-900">{{ property.stats?.averageRating?.toFixed(1) || '0.0' }}</span>
+                  <span class="text-xs text-gray-500 ml-1">({{ property.stats?.reviewCount || 0 }})</span>
                 </div>
               </td>
               <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                {{ property.bookings }}
+                {{ property.stats?.totalBookings || 0 }}
               </td>
               <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                 <div class="flex items-center justify-end space-x-2">
@@ -199,170 +199,133 @@ import { Building2, Plus, Search, Eye, Check, X, Ban, Star, ChevronLeft, Chevron
 
 definePageMeta({
   layout: 'dashboard-admin',
+  middleware: 'admin',
 })
+
+const payload = usePayload()
+const { toast } = useToast()
+const { confirm } = useConfirm()
 
 const searchQuery = ref('')
 const selectedStatus = ref('all')
+const loading = ref(true)
+const properties = ref<any[]>([])
 
 const statuses = [
   { label: 'All Status', value: 'all' },
   { label: 'Pending', value: 'pending' },
-  { label: 'Approved', value: 'approved' },
-  { label: 'Suspended', value: 'suspended' },
-  { label: 'Rejected', value: 'rejected' }
+  { label: 'Active', value: 'active' },
+  { label: 'Inactive', value: 'inactive' },
+  { label: 'Suspended', value: 'suspended' }
 ]
 
-const properties = [
-  {
-    id: 1,
-    name: 'Premium Suite',
-    owner: 'Michael Chen',
-    ownerEmail: 'michael@example.com',
-    location: 'Downtown Plaza, NYC',
-    status: 'approved',
-    rating: 4.8,
-    reviews: 124,
-    bookings: 342,
-    featured: true
-  },
-  {
-    id: 2,
-    name: 'Executive Lounge',
-    owner: 'Jessica Martinez',
-    ownerEmail: 'jessica@example.com',
-    location: 'City Center, LA',
-    status: 'approved',
-    rating: 4.6,
-    reviews: 89,
-    bookings: 256,
-    featured: false
-  },
-  {
-    id: 3,
-    name: 'Luxury Washroom',
-    owner: 'Ashley Brown',
-    ownerEmail: 'ashley@example.com',
-    location: 'Midtown, Chicago',
-    status: 'pending',
-    rating: 0,
-    reviews: 0,
-    bookings: 0,
-    featured: false
-  },
-  {
-    id: 4,
-    name: 'Deluxe Bathroom',
-    owner: 'Daniel Lee',
-    ownerEmail: 'daniel@example.com',
-    location: 'Financial District, SF',
-    status: 'approved',
-    rating: 4.9,
-    reviews: 215,
-    bookings: 478,
-    featured: true
-  },
-  {
-    id: 5,
-    name: 'Standard Suite',
-    owner: 'Ryan Thompson',
-    ownerEmail: 'ryan@example.com',
-    location: 'Arts District, Miami',
-    status: 'suspended',
-    rating: 3.2,
-    reviews: 34,
-    bookings: 87,
-    featured: false
-  },
-  {
-    id: 6,
-    name: 'Business Class Restroom',
-    owner: 'Sophia Taylor',
-    ownerEmail: 'sophia@example.com',
-    location: 'Tech Hub, Austin',
-    status: 'pending',
-    rating: 0,
-    reviews: 0,
-    bookings: 0,
-    featured: false
-  },
-  {
-    id: 7,
-    name: 'VIP Lounge',
-    owner: 'Matthew White',
-    ownerEmail: 'matthew@example.com',
-    location: 'Downtown, Seattle',
-    status: 'approved',
-    rating: 4.7,
-    reviews: 156,
-    bookings: 389,
-    featured: true
-  },
-  {
-    id: 8,
-    name: 'Comfort Suite',
-    owner: 'Olivia Garcia',
-    ownerEmail: 'olivia@example.com',
-    location: 'Pearl District, Portland',
-    status: 'rejected',
-    rating: 0,
-    reviews: 0,
-    bookings: 0,
-    featured: false
-  },
-  {
-    id: 9,
-    name: 'Modern Restroom',
-    owner: 'James Anderson',
-    ownerEmail: 'james@example.com',
-    location: 'Capitol Hill, Denver',
-    status: 'approved',
-    rating: 4.5,
-    reviews: 92,
-    bookings: 234,
-    featured: false
-  },
-  {
-    id: 10,
-    name: 'Elite Washroom',
-    owner: 'Emma Davis',
-    ownerEmail: 'emma@example.com',
-    location: 'Fremont, Las Vegas',
-    status: 'pending',
-    rating: 0,
-    reviews: 0,
-    bookings: 0,
-    featured: false
+onMounted(async () => {
+  await fetchProperties()
+})
+
+async function fetchProperties() {
+  try {
+    loading.value = true
+    const response = await payload.find('properties', {
+      limit: 1000,
+      depth: 2,
+      sort: '-createdAt'
+    })
+    properties.value = response.docs
+  } catch (error) {
+    console.error('Failed to fetch properties:', error)
+  } finally {
+    loading.value = false
   }
-]
+}
 
 const filteredProperties = computed(() => {
-  return properties.filter(property => {
+  return properties.value.filter(property => {
     const matchesStatus = selectedStatus.value === 'all' || property.status === selectedStatus.value
     const matchesSearch = !searchQuery.value ||
-      property.name.toLowerCase().includes(searchQuery.value.toLowerCase()) ||
-      property.owner.toLowerCase().includes(searchQuery.value.toLowerCase()) ||
-      property.location.toLowerCase().includes(searchQuery.value.toLowerCase())
+      property.name?.toLowerCase().includes(searchQuery.value.toLowerCase()) ||
+      (property.owner?.firstName || '').toLowerCase().includes(searchQuery.value.toLowerCase()) ||
+      (property.owner?.lastName || '').toLowerCase().includes(searchQuery.value.toLowerCase()) ||
+      property.location?.address?.toLowerCase().includes(searchQuery.value.toLowerCase())
     return matchesStatus && matchesSearch
   })
 })
 
-const approveProperty = (propertyId: number) => {
-  console.log(`Approving property ${propertyId}`)
-  // In a real app, this would make an API call
+function getPropertyLocation(property: any): string {
+  return `${property.location?.address || ''}, ${property.location?.city || ''}`.trim()
 }
 
-const rejectProperty = (propertyId: number) => {
-  console.log(`Rejecting property ${propertyId}`)
-  // In a real app, this would make an API call
+function getOwnerName(property: any): string {
+  if (typeof property.owner === 'string') return 'Loading...'
+  return `${property.owner?.firstName || ''} ${property.owner?.lastName || ''}`.trim() || property.owner?.email || 'Unknown'
 }
 
-const toggleFeatured = (propertyId: number) => {
-  console.log(`Toggling featured status for property ${propertyId}`)
-  // In a real app, this would make an API call
+function getOwnerEmail(property: any): string {
+  if (typeof property.owner === 'string') return ''
+  return property.owner?.email || ''
 }
 
-const suspendProperty = (propertyId: number) => {
-  console.log(`Suspending property ${propertyId}`)
-  // In a real app, this would make an API call
+async function approveProperty(propertyId: string) {
+  try {
+    await payload.update('properties', propertyId, { status: 'active' })
+    const property = properties.value.find(p => p.id === propertyId)
+    if (property) property.status = 'active'
+    toast.success('Property approved')
+  } catch (error) {
+    console.error('Failed to approve property:', error)
+    toast.error('Failed to approve property')
+  }
+}
+
+async function rejectProperty(propertyId: string) {
+  const confirmed = await confirm({
+    title: 'Reject Property',
+    message: 'Are you sure you want to reject this property?',
+    confirmText: 'Reject',
+    variant: 'destructive',
+  })
+  if (!confirmed) return
+  try {
+    await payload.update('properties', propertyId, { status: 'inactive' })
+    const property = properties.value.find(p => p.id === propertyId)
+    if (property) property.status = 'inactive'
+    toast.success('Property rejected')
+  } catch (error) {
+    console.error('Failed to reject property:', error)
+    toast.error('Failed to reject property')
+  }
+}
+
+async function toggleFeatured(propertyId: string) {
+  try {
+    const property = properties.value.find(p => p.id === propertyId)
+    if (!property) return
+
+    await payload.update('properties', propertyId, { featured: !property.featured })
+    property.featured = !property.featured
+    toast.success(property.featured ? 'Property featured' : 'Property unfeatured')
+  } catch (error) {
+    console.error('Failed to toggle featured:', error)
+    toast.error('Failed to toggle featured status')
+  }
+}
+
+async function suspendProperty(propertyId: string) {
+  const confirmed = await confirm({
+    title: 'Suspend Property',
+    message: 'Are you sure you want to suspend this property?',
+    confirmText: 'Suspend',
+    variant: 'destructive',
+  })
+  if (!confirmed) return
+  try {
+    await payload.update('properties', propertyId, { status: 'suspended' })
+    const property = properties.value.find(p => p.id === propertyId)
+    if (property) property.status = 'suspended'
+    toast.success('Property suspended')
+  } catch (error) {
+    console.error('Failed to suspend property:', error)
+    toast.error('Failed to suspend property')
+  }
 }
 </script>

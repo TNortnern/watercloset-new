@@ -14,97 +14,90 @@ import {
 
 definePageMeta({
   layout: 'dashboard-provider',
+  middleware: 'provider'
 })
 
-const stats = {
-  totalEarnings: 12450,
-  availableBalance: 3240,
-  pending: 890,
-  feesPaid: 1245
+const auth = useAuth()
+const payload = usePayload()
+
+interface Booking {
+  id: string
+  property: { id: string, name: string }
+  startTime: string
+  endTime: string
+  totalAmount: number
+  providerPayout: number
+  platformFee: number
+  status: string
+  createdAt: string
 }
 
-const transactions = [
-  {
-    id: 'TXN-1001',
-    date: '2025-12-17',
-    description: 'Booking #BK-1005',
-    property: 'Garden View Powder Room',
-    amount: 30.00,
-    fee: 3.00,
-    net: 27.00,
-    status: 'completed'
-  },
-  {
-    id: 'TXN-1002',
-    date: '2025-12-17',
-    description: 'Booking #BK-1004',
-    property: 'Executive Suite Bath',
-    amount: 52.50,
-    fee: 5.25,
-    net: 47.25,
-    status: 'completed'
-  },
-  {
-    id: 'TXN-1003',
-    date: '2025-12-16',
-    description: 'Payout to Bank Account',
-    property: null,
-    amount: -500.00,
-    fee: 0,
-    net: -500.00,
-    status: 'processed'
-  },
-  {
-    id: 'TXN-1004',
-    date: '2025-12-16',
-    description: 'Booking #BK-1003',
-    property: 'Modern Minimalist Washroom',
-    amount: 90.00,
-    fee: 9.00,
-    net: 81.00,
-    status: 'completed'
-  },
-  {
-    id: 'TXN-1005',
-    date: '2025-12-15',
-    description: 'Booking #BK-1002',
-    property: 'Spa Retreat Bathroom',
-    amount: 45.00,
-    fee: 4.50,
-    net: 40.50,
-    status: 'completed'
-  },
-  {
-    id: 'TXN-1006',
-    date: '2025-12-15',
-    description: 'Booking #BK-1001',
-    property: 'Downtown Luxury Suite',
-    amount: 67.50,
-    fee: 6.75,
-    net: 60.75,
-    status: 'completed'
-  },
-  {
-    id: 'TXN-1007',
-    date: '2025-12-14',
-    description: 'Booking #BK-0998',
-    property: 'Penthouse Premium Bath',
-    amount: 100.00,
-    fee: 10.00,
-    net: 90.00,
-    status: 'pending'
-  },
-  {
-    id: 'TXN-1008',
-    date: '2025-12-13',
-    description: 'Booking #BK-0997',
-    property: 'Downtown Luxury Suite',
-    amount: 75.00,
-    fee: 7.50,
-    net: 67.50,
-    status: 'completed'
+// Fetch all bookings for provider's properties
+const { data: bookingsData } = await useAsyncData('earnings-bookings', async () => {
+  if (!auth.user.value?.id) return null
+  return await payload.find<Booking>('bookings', {
+    where: {
+      'property.owner': { equals: auth.user.value.id }
+    },
+    depth: 2,
+    limit: 500,
+    sort: '-createdAt'
+  })
+})
+
+const allBookings = computed(() => bookingsData.value?.docs || [])
+
+// Calculate earnings stats
+const stats = computed(() => {
+  const completedBookings = allBookings.value.filter(b => b.status === 'completed')
+  const totalEarnings = completedBookings.reduce((sum, b) => sum + (b.providerPayout || 0), 0) / 100
+
+  const now = new Date()
+  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1)
+  const thisMonthBookings = completedBookings.filter(b =>
+    new Date(b.createdAt) >= startOfMonth
+  )
+  const availableBalance = thisMonthBookings.reduce((sum, b) => sum + (b.providerPayout || 0), 0) / 100
+
+  const pendingBookings = allBookings.value.filter(b => b.status === 'confirmed')
+  const pending = pendingBookings.reduce((sum, b) => sum + (b.providerPayout || 0), 0) / 100
+
+  const feesPaid = completedBookings.reduce((sum, b) => sum + (b.platformFee || 0), 0) / 100
+
+  return {
+    totalEarnings,
+    availableBalance,
+    pending,
+    feesPaid
   }
-]
+})
+
+// Transform bookings into transactions
+const transactions = computed(() => {
+  return allBookings.value.map(booking => {
+    const createdAt = new Date(booking.createdAt)
+    const property = booking.property
+    const propertyName = typeof property === 'object' ? property.name : 'Unknown Property'
+
+    let status = 'pending'
+    if (booking.status === 'completed') {
+      status = 'completed'
+    } else if (booking.status === 'cancelled') {
+      status = 'cancelled'
+    }
+
+    return {
+      id: booking.id,
+      date: createdAt.toISOString().split('T')[0],
+      description: `Booking #${booking.id.slice(0, 8)}`,
+      property: propertyName,
+      amount: (booking.totalAmount || 0) / 100,
+      fee: (booking.platformFee || 0) / 100,
+      net: (booking.providerPayout || 0) / 100,
+      status
+    }
+  }).slice(0, 50) // Show latest 50 transactions
+})
 
 const getStatusColor = (status: string) => {
   const colors = {

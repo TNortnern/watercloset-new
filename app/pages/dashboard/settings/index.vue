@@ -261,53 +261,18 @@
       <!-- Payment Tab -->
       <TabsContent value="payment">
         <div class="space-y-6">
-          <!-- Payment Methods -->
+          <!-- Payment Methods - Coming Soon -->
           <Card>
             <CardHeader class="border-b border-slate-200">
-              <div class="flex items-center justify-between">
-                <CardTitle>Payment Methods</CardTitle>
-                <Button size="sm" @click="addPaymentMethod">
-                  <Plus class="w-4 h-4 mr-2" />
-                  Add Card
-                </Button>
-              </div>
+              <CardTitle>Payment Methods</CardTitle>
             </CardHeader>
             <CardContent class="p-6">
-              <div class="space-y-4">
-                <div
-                  v-for="card in paymentMethods"
-                  :key="card.id"
-                  class="flex items-center justify-between p-4 border border-slate-200 rounded-lg"
-                >
-                  <div class="flex items-center gap-4">
-                    <div class="w-12 h-12 bg-slate-100 rounded-lg flex items-center justify-center">
-                      <CreditCard class="w-6 h-6 text-slate-600" />
-                    </div>
-                    <div>
-                      <p class="font-medium text-slate-900">{{ card.brand }} •••• {{ card.last4 }}</p>
-                      <p class="text-sm text-slate-600">Expires {{ card.expiry }}</p>
-                    </div>
-                    <span
-                      v-if="card.default"
-                      class="px-2 py-1 text-xs font-medium bg-blue-100 text-blue-700 rounded"
-                    >
-                      Default
-                    </span>
-                  </div>
-                  <div class="flex items-center gap-2">
-                    <Button
-                      v-if="!card.default"
-                      variant="outline"
-                      size="sm"
-                      @click="setDefaultCard(card.id)"
-                    >
-                      Set Default
-                    </Button>
-                    <Button variant="ghost" size="sm" @click="removeCard(card.id)">
-                      <Trash2 class="w-4 h-4" />
-                    </Button>
-                  </div>
-                </div>
+              <div class="text-center py-8">
+                <CreditCard class="w-12 h-12 mx-auto text-slate-300" />
+                <p class="mt-4 text-slate-600 font-medium">Payment Integration Coming Soon</p>
+                <p class="mt-2 text-sm text-slate-500">
+                  We're working on integrating secure payment methods. You'll be able to manage your cards and payment options here.
+                </p>
               </div>
             </CardContent>
           </Card>
@@ -318,7 +283,7 @@
               <CardTitle>Billing History</CardTitle>
             </CardHeader>
             <CardContent class="p-6">
-              <div class="space-y-3">
+              <div v-if="billingHistory.length > 0" class="space-y-3">
                 <div
                   v-for="transaction in billingHistory"
                   :key="transaction.id"
@@ -329,12 +294,14 @@
                     <p class="text-xs text-slate-600">{{ transaction.date }}</p>
                   </div>
                   <div class="flex items-center gap-4">
-                    <span class="text-sm font-semibold text-slate-900">${{ transaction.amount }}</span>
-                    <Button variant="ghost" size="sm">
-                      <Download class="w-4 h-4" />
-                    </Button>
+                    <span class="text-sm font-semibold text-slate-900">${{ transaction.amount.toFixed(2) }}</span>
                   </div>
                 </div>
+              </div>
+              <div v-else class="text-center py-8">
+                <Download class="w-12 h-12 mx-auto text-slate-300" />
+                <p class="mt-4 text-slate-600">No billing history yet</p>
+                <p class="mt-2 text-sm text-slate-500">Your booking history will appear here once you make your first booking.</p>
               </div>
             </CardContent>
           </Card>
@@ -426,7 +393,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, computed, watch } from 'vue'
 import {
   User,
   Bell,
@@ -447,18 +414,39 @@ definePageMeta({
   layout: 'dashboard-user',
 })
 
-const activeTab = ref('profile')
+const { user } = useAuth()
+const payload = usePayload()
+const { toast } = useToast()
+const { confirm } = useConfirm()
 
-// Profile data
+const activeTab = ref('profile')
+const isSaving = ref(false)
+
+// Profile data from current user
 const profile = ref({
-  firstName: 'Sarah',
-  lastName: 'Johnson',
-  email: 'sarah.j@example.com',
-  phone: '+1 (555) 123-4567',
-  bio: 'Frequent traveler and bathroom enthusiast. Always on the lookout for clean and comfortable facilities!',
+  firstName: '',
+  lastName: '',
+  email: '',
+  phone: '',
+  bio: '',
 })
 
-// Notification preferences
+// Initialize and watch for user changes
+const initProfile = () => {
+  if (user.value) {
+    profile.value = {
+      firstName: user.value.firstName || '',
+      lastName: user.value.lastName || '',
+      email: user.value.email || '',
+      phone: user.value.phone || '',
+      bio: user.value.bio || '',
+    }
+  }
+}
+
+watch(() => user.value, initProfile, { immediate: true })
+
+// Notification preferences - stored in localStorage for now
 const notifications = ref({
   bookingConfirmEmail: true,
   bookingConfirmSms: true,
@@ -473,51 +461,54 @@ const notifications = ref({
   newsletterEmail: true,
 })
 
-// Payment methods
-const paymentMethods = ref([
-  {
-    id: 1,
-    brand: 'Visa',
-    last4: '4242',
-    expiry: '12/2026',
-    default: true,
-  },
-  {
-    id: 2,
-    brand: 'Mastercard',
-    last4: '5555',
-    expiry: '08/2025',
-    default: false,
-  },
-])
+// Load notifications from localStorage
+if (typeof window !== 'undefined') {
+  const stored = localStorage.getItem('notificationPreferences')
+  if (stored) {
+    try {
+      notifications.value = { ...notifications.value, ...JSON.parse(stored) }
+    } catch (error) {
+      console.error('Failed to load notification preferences:', error)
+    }
+  }
+}
 
-// Billing history
-const billingHistory = ref([
-  {
-    id: 1,
-    description: 'Booking at Luxury Downtown Restroom',
-    date: 'Dec 18, 2025',
-    amount: 15,
+// Payment methods - TODO: Implement with Stripe
+const paymentMethods = ref([])
+
+// Billing history from bookings
+const { data: bookingsData } = await useAsyncData(
+  'settings-billing-history',
+  async () => {
+    if (!user.value?.id) return null
+    return await payload.find('bookings', {
+      where: {
+        user: { equals: user.value.id },
+        status: { not_equals: 'cancelled' },
+      },
+      depth: 1,
+      sort: '-createdAt',
+      limit: 10,
+    })
   },
-  {
-    id: 2,
-    description: 'Booking at Cozy Cafe Bathroom',
-    date: 'Dec 15, 2025',
-    amount: 8,
-  },
-  {
-    id: 3,
-    description: 'Booking at Modern Office Restroom',
-    date: 'Dec 10, 2025',
-    amount: 12,
-  },
-  {
-    id: 4,
-    description: 'Booking at Premium Hotel Facilities',
-    date: 'Dec 5, 2025',
-    amount: 20,
-  },
-])
+  { watch: [() => user.value?.id] }
+)
+
+const billingHistory = computed(() => {
+  if (!bookingsData.value?.docs) return []
+
+  return bookingsData.value.docs.map((booking: any) => {
+    const property = booking.property
+    const date = new Date(booking.startTime).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+
+    return {
+      id: booking.id,
+      description: `Booking at ${property?.name || 'Unknown Property'}`,
+      date,
+      amount: booking.totalPrice || 0,
+    }
+  })
+})
 
 // Security
 const security = ref({
@@ -527,55 +518,115 @@ const security = ref({
 })
 
 // Actions
-const saveProfile = () => {
-  alert('Profile saved successfully!')
+const saveProfile = async () => {
+  if (!user.value?.id) return
+
+  isSaving.value = true
+  try {
+    await payload.update('users', user.value.id, {
+      firstName: profile.value.firstName,
+      lastName: profile.value.lastName,
+      email: profile.value.email,
+      phone: profile.value.phone,
+      bio: profile.value.bio,
+    })
+
+    // Update local user state
+    user.value = {
+      ...user.value,
+      ...profile.value,
+    }
+
+    toast.success('Profile saved successfully!')
+  } catch (error) {
+    console.error('Failed to update profile:', error)
+    toast.error('Failed to update profile. Please try again.')
+  } finally {
+    isSaving.value = false
+  }
 }
 
 const cancelProfileChanges = () => {
-  alert('Changes cancelled')
+  profile.value = {
+    firstName: user.value?.firstName || '',
+    lastName: user.value?.lastName || '',
+    email: user.value?.email || '',
+    phone: user.value?.phone || '',
+    bio: user.value?.bio || '',
+  }
 }
 
 const saveNotifications = () => {
-  alert('Notification preferences saved!')
+  // Save to localStorage
+  if (typeof window !== 'undefined') {
+    localStorage.setItem('notificationPreferences', JSON.stringify(notifications.value))
+  }
+  toast.success('Notification preferences saved!')
 }
 
 const addPaymentMethod = () => {
-  alert('Add payment method modal')
+  // TODO: Implement Stripe payment method addition
+  toast.info('Payment method feature coming soon')
 }
 
 const setDefaultCard = (id: number) => {
   paymentMethods.value.forEach(card => {
     card.default = card.id === id
   })
+  toast.success('Default card updated')
 }
 
-const removeCard = (id: number) => {
-  if (confirm('Are you sure you want to remove this card?')) {
+const removeCard = async (id: number) => {
+  const confirmed = await confirm({
+    title: 'Remove Card',
+    message: 'Are you sure you want to remove this card?',
+    confirmText: 'Remove',
+    variant: 'destructive',
+  })
+
+  if (confirmed) {
     const index = paymentMethods.value.findIndex(c => c.id === id)
     if (index !== -1) {
       paymentMethods.value.splice(index, 1)
+      toast.success('Card removed successfully')
     }
   }
 }
 
-const changePassword = () => {
+const changePassword = async () => {
   if (security.value.newPassword !== security.value.confirmPassword) {
-    alert('Passwords do not match!')
+    toast.error('Passwords do not match!')
     return
   }
-  alert('Password changed successfully!')
+
+  if (!security.value.currentPassword || !security.value.newPassword) {
+    toast.error('Please fill in all password fields')
+    return
+  }
+
+  // TODO: Implement password change through Payload
+  toast.info('Password change functionality coming soon')
   security.value.currentPassword = ''
   security.value.newPassword = ''
   security.value.confirmPassword = ''
 }
 
 const enable2FA = () => {
-  alert('Enable 2FA modal')
+  // TODO: Implement 2FA
+  toast.info('Two-factor authentication coming soon')
 }
 
-const deleteAccount = () => {
-  if (confirm('Are you absolutely sure? This action cannot be undone.')) {
-    alert('Account deletion process initiated')
-  }
+const deleteAccount = async () => {
+  const confirmed = await confirm({
+    title: 'Delete Account',
+    message: 'Are you absolutely sure? This action cannot be undone. All your data will be permanently deleted.',
+    confirmText: 'Delete My Account',
+    variant: 'destructive',
+  })
+
+  if (!confirmed) return
+
+  // TODO: Implement account deletion
+  toast.info('Account deletion feature coming soon')
 }
 </script>

@@ -50,24 +50,24 @@ const handleLogout = async () => {
       <div v-else class="flex items-center gap-4">
         <!-- Quick Actions -->
         <NuxtLink
-          v-if="isProvider || isAdmin"
-          to="/manage"
-          class="text-sm font-medium text-muted-foreground hover:text-primary transition-colors"
+          to="/search"
+          class="text-sm font-medium text-muted-foreground hover:text-primary transition-colors hidden md:block"
         >
-          Dashboard
+          Find Bathrooms
         </NuxtLink>
 
         <NuxtLink
-          to="/bookings"
-          class="text-sm font-medium text-muted-foreground hover:text-primary transition-colors"
+          v-if="isProvider || isAdmin"
+          to="/manage"
+          class="text-sm font-medium text-muted-foreground hover:text-primary transition-colors hidden md:block"
         >
-          My Bookings
+          Provider Dashboard
         </NuxtLink>
 
         <!-- User Menu -->
         <div class="relative">
           <button
-            @click="showUserMenu = !showUserMenu"
+            @click.stop="showUserMenu = !showUserMenu"
             class="flex items-center gap-2 p-1 rounded-full hover:bg-slate-100 transition-colors"
           >
             <div
@@ -94,7 +94,7 @@ const handleLogout = async () => {
           >
             <div
               v-if="showUserMenu"
-              class="absolute right-0 mt-2 w-56 rounded-lg bg-white shadow-lg ring-1 ring-black/5 py-1"
+              class="absolute right-0 mt-2 w-56 rounded-lg bg-white shadow-lg ring-1 ring-black/5 py-1 z-50"
             >
               <div class="px-4 py-3 border-b border-slate-100">
                 <p class="text-sm font-medium text-slate-900">{{ displayName }}</p>
@@ -102,7 +102,23 @@ const handleLogout = async () => {
               </div>
 
               <NuxtLink
-                to="/profile"
+                to="/dashboard"
+                @click="showUserMenu = false"
+                class="block px-4 py-2 text-sm text-slate-700 hover:bg-slate-50"
+              >
+                Dashboard
+              </NuxtLink>
+
+              <NuxtLink
+                to="/dashboard/favorites"
+                @click="showUserMenu = false"
+                class="block px-4 py-2 text-sm text-slate-700 hover:bg-slate-50"
+              >
+                Favorites
+              </NuxtLink>
+
+              <NuxtLink
+                to="/dashboard/profile"
                 @click="showUserMenu = false"
                 class="block px-4 py-2 text-sm text-slate-700 hover:bg-slate-50"
               >
@@ -110,12 +126,14 @@ const handleLogout = async () => {
               </NuxtLink>
 
               <NuxtLink
-                to="/bookings"
+                to="/dashboard/settings"
                 @click="showUserMenu = false"
                 class="block px-4 py-2 text-sm text-slate-700 hover:bg-slate-50"
               >
-                My Bookings
+                Settings
               </NuxtLink>
+
+              <div class="border-t border-slate-100 my-1" />
 
               <NuxtLink
                 v-if="isProvider || isAdmin"

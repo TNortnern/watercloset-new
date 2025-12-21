@@ -15,168 +15,111 @@ import {
 
 definePageMeta({
   layout: 'dashboard-provider',
+  middleware: 'provider'
 })
+
+const auth = useAuth()
+const payload = usePayload()
+const { toast } = useToast()
+
+interface Booking {
+  id: string
+  user: { id: string, firstName: string, lastName: string, email: string }
+  property: { id: string, name: string, location: { address: string, city: string, state: string } }
+  startTime: string
+  endTime: string
+  totalAmount: number
+  status: string
+}
 
 const searchQuery = ref('')
 const selectedTab = ref('all')
 const showDatePicker = ref(false)
 
-const tabs = [
-  { value: 'all', label: 'All Bookings', count: 45 },
-  { value: 'today', label: 'Today', count: 3 },
-  { value: 'upcoming', label: 'Upcoming', count: 12 },
-  { value: 'completed', label: 'Completed', count: 30 }
-]
+// Fetch all bookings for provider's properties
+const { data: bookingsData, refresh: refreshBookings } = await useAsyncData('provider-bookings-page', async () => {
+  if (!auth.user.value?.id) return null
+  return await payload.find<Booking>('bookings', {
+    where: {
+      'property.owner': { equals: auth.user.value.id }
+    },
+    depth: 2,
+    limit: 200,
+    sort: '-createdAt'
+  })
+})
 
-const bookings = [
-  {
-    id: 'BK-1001',
-    guest: {
-      name: 'Sarah Johnson',
-      avatar: 'SJ',
-      email: 'sarah.j@example.com'
-    },
-    property: {
-      name: 'Downtown Luxury Suite',
-      address: '123 Main Street, New York'
-    },
-    date: '2025-12-18',
-    time: '14:30',
-    duration: 45,
-    amount: 67.50,
-    status: 'confirmed',
-    category: 'upcoming'
-  },
-  {
-    id: 'BK-1002',
-    guest: {
-      name: 'Michael Chen',
-      avatar: 'MC',
-      email: 'mchen@example.com'
-    },
-    property: {
-      name: 'Spa Retreat Bathroom',
-      address: '456 Park Avenue, Manhattan'
-    },
-    date: '2025-12-18',
-    time: '16:00',
-    duration: 30,
-    amount: 45.00,
-    status: 'confirmed',
-    category: 'upcoming'
-  },
-  {
-    id: 'BK-1003',
-    guest: {
-      name: 'Emily Rodriguez',
-      avatar: 'ER',
-      email: 'emily.r@example.com'
-    },
-    property: {
-      name: 'Modern Minimalist Washroom',
-      address: '789 Broadway, Brooklyn'
-    },
-    date: '2025-12-17',
-    time: '10:15',
-    duration: 60,
-    amount: 90.00,
-    status: 'confirmed',
-    category: 'today'
-  },
-  {
-    id: 'BK-1004',
-    guest: {
-      name: 'David Kim',
-      avatar: 'DK',
-      email: 'dkim@example.com'
-    },
-    property: {
-      name: 'Executive Suite Bath',
-      address: '321 Wall Street, Financial District'
-    },
-    date: '2025-12-17',
-    time: '12:00',
-    duration: 30,
-    amount: 52.50,
-    status: 'in-progress',
-    category: 'today'
-  },
-  {
-    id: 'BK-1005',
-    guest: {
-      name: 'Lisa Thompson',
-      avatar: 'LT',
-      email: 'lisa.t@example.com'
-    },
-    property: {
-      name: 'Garden View Powder Room',
-      address: '654 Garden Street, Queens'
-    },
-    date: '2025-12-16',
-    time: '09:30',
-    duration: 20,
-    amount: 30.00,
-    status: 'completed',
-    category: 'completed'
-  },
-  {
-    id: 'BK-1006',
-    guest: {
-      name: 'James Wilson',
-      avatar: 'JW',
-      email: 'jwilson@example.com'
-    },
-    property: {
-      name: 'Vintage Charm Restroom',
-      address: '987 Heritage Lane, Brooklyn'
-    },
-    date: '2025-12-19',
-    time: '15:45',
-    duration: 40,
-    amount: 52.00,
-    status: 'confirmed',
-    category: 'upcoming'
-  },
-  {
-    id: 'BK-1007',
-    guest: {
-      name: 'Maria Garcia',
-      avatar: 'MG',
-      email: 'maria.g@example.com'
-    },
-    property: {
-      name: 'Penthouse Premium Bath',
-      address: '111 Skyline Drive, Manhattan'
-    },
-    date: '2025-12-15',
-    time: '11:00',
-    duration: 50,
-    amount: 100.00,
-    status: 'completed',
-    category: 'completed'
-  },
-  {
-    id: 'BK-1008',
-    guest: {
-      name: 'Robert Taylor',
-      avatar: 'RT',
-      email: 'rtaylor@example.com'
-    },
-    property: {
-      name: 'Downtown Luxury Suite',
-      address: '123 Main Street, New York'
-    },
-    date: '2025-12-17',
-    time: '18:30',
-    duration: 35,
-    amount: 52.50,
-    status: 'confirmed',
-    category: 'today'
-  }
-]
+const allBookings = computed(() => bookingsData.value?.docs || [])
 
+// Transform bookings for display
+const bookings = computed(() => {
+  return allBookings.value.map(booking => {
+    const user = booking.user
+    const property = booking.property
+    const startTime = new Date(booking.startTime)
+    const endTime = new Date(booking.endTime)
+    const duration = Math.round((endTime.getTime() - startTime.getTime()) / (1000 * 60))
+    const now = new Date()
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+    const bookingDate = new Date(startTime.getFullYear(), startTime.getMonth(), startTime.getDate())
+
+    const firstName = typeof user === 'object' ? user.firstName : ''
+    const lastName = typeof user === 'object' ? user.lastName : ''
+    const email = typeof user === 'object' ? user.email : ''
+    const propertyName = typeof property === 'object' ? property.name : 'Unknown Property'
+    const propertyAddress = typeof property === 'object' && property.location
+      ? `${property.location.address}, ${property.location.city}`
+      : 'Unknown Address'
+
+    // Determine category
+    let category = 'completed'
+    if (booking.status === 'confirmed' || booking.status === 'in-progress') {
+      if (bookingDate.getTime() === today.getTime()) {
+        category = 'today'
+      } else if (bookingDate > today) {
+        category = 'upcoming'
+      }
+    }
+
+    return {
+      id: booking.id,
+      guest: {
+        name: `${firstName} ${lastName}`.trim(),
+        avatar: `${firstName.charAt(0)}${lastName.charAt(0)}`.toUpperCase(),
+        email
+      },
+      property: {
+        name: propertyName,
+        address: propertyAddress
+      },
+      date: startTime.toISOString().split('T')[0],
+      time: startTime.toTimeString().slice(0, 5),
+      duration,
+      amount: booking.totalAmount / 100, // Convert from cents to dollars
+      status: booking.status,
+      category
+    }
+  })
+})
+
+// Calculate tab counts
+const tabs = computed(() => {
+  const all = bookings.value.length
+  const today = bookings.value.filter(b => b.category === 'today').length
+  const upcoming = bookings.value.filter(b => b.category === 'upcoming').length
+  const completed = bookings.value.filter(b => b.category === 'completed').length
+
+  return [
+    { value: 'all', label: 'All Bookings', count: all },
+    { value: 'today', label: 'Today', count: today },
+    { value: 'upcoming', label: 'Upcoming', count: upcoming },
+    { value: 'completed', label: 'Completed', count: completed }
+  ]
+})
+
+// Filter bookings
 const filteredBookings = computed(() => {
-  let filtered = bookings
+  let filtered = bookings.value
 
   if (selectedTab.value !== 'all') {
     filtered = filtered.filter(b => b.category === selectedTab.value)
@@ -193,6 +136,17 @@ const filteredBookings = computed(() => {
 
   return filtered
 })
+
+const updateBookingStatus = async (bookingId: string, newStatus: string) => {
+  try {
+    await payload.update('bookings', bookingId, { status: newStatus })
+    await refreshBookings()
+    toast.success('Booking status updated')
+  } catch (error) {
+    console.error('Failed to update booking status:', error)
+    toast.error('Failed to update booking status')
+  }
+}
 
 const getStatusColor = (status: string) => {
   const colors = {
@@ -364,7 +318,7 @@ const getStatusLabel = (status: string) => {
                   </button>
                   <button
                     v-if="booking.status !== 'completed' && booking.status !== 'cancelled'"
-                    @click="console.log('Cancel booking:', booking.id)"
+                    @click="updateBookingStatus(booking.id, 'cancelled')"
                     class="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
                     title="Cancel Booking"
                   >

@@ -1,5 +1,14 @@
 import type { CollectionConfig } from 'payload'
 
+const getRelationshipId = (value: unknown): number | string | null => {
+  if (typeof value === 'string' || typeof value === 'number') return value
+  if (value && typeof value === 'object' && 'id' in value) {
+    const id = (value as { id?: number | string }).id
+    return typeof id === 'string' || typeof id === 'number' ? id : null
+  }
+  return null
+}
+
 export const Reviews: CollectionConfig = {
   slug: 'reviews',
   admin: {
@@ -21,6 +30,9 @@ export const Reviews: CollectionConfig = {
     beforeValidate: [
       async ({ req, data, operation }) => {
         if (operation === 'create' && data?.booking) {
+          if (!req.user) {
+            throw new Error('Authentication required')
+          }
           // Verify user completed this booking
           const booking = await req.payload.findByID({
             collection: 'bookings',
@@ -31,7 +43,8 @@ export const Reviews: CollectionConfig = {
             throw new Error('Can only review completed bookings')
           }
 
-          if (booking.user !== req.user?.id) {
+          const bookingUserId = getRelationshipId(booking.user)
+          if (!bookingUserId || bookingUserId !== req.user.id) {
             throw new Error('Can only review your own bookings')
           }
 
@@ -48,9 +61,11 @@ export const Reviews: CollectionConfig = {
           }
 
           // Set property from booking
-          data.property = typeof booking.property === 'string'
-            ? booking.property
-            : booking.property.id
+          const propertyId = getRelationshipId(booking.property)
+          if (!propertyId) {
+            throw new Error('Booking property not found')
+          }
+          data.property = propertyId
           data.user = req.user.id
         }
         return data
@@ -60,9 +75,8 @@ export const Reviews: CollectionConfig = {
       async ({ doc, operation, req }) => {
         // Update property stats after review
         if (operation === 'create' || operation === 'update') {
-          const propertyId = typeof doc.property === 'string'
-            ? doc.property
-            : doc.property.id
+          const propertyId = getRelationshipId(doc.property)
+          if (!propertyId) return
 
           const reviews = await req.payload.find({
             collection: 'reviews',
@@ -87,6 +101,20 @@ export const Reviews: CollectionConfig = {
               },
             },
           })
+
+          // Update booking hasBeenReviewed field
+          if (operation === 'create') {
+            const bookingId = getRelationshipId(doc.booking)
+            if (!bookingId) return
+
+            await req.payload.update({
+              collection: 'bookings',
+              id: bookingId,
+              data: {
+                hasBeenReviewed: true,
+              },
+            })
+          }
         }
       },
     ],

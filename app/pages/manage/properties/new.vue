@@ -3,7 +3,6 @@ import {
   ArrowLeft,
   ArrowRight,
   Check,
-  Upload,
   MapPin,
   Home,
   Image as ImageIcon,
@@ -11,22 +10,38 @@ import {
   Calendar,
   Save
 } from 'lucide-vue-next'
+import { ImageUpload } from '@/components/ui/upload'
 
 definePageMeta({
   layout: 'dashboard-provider',
+  middleware: 'provider'
 })
+
+const auth = useAuth()
+const payload = usePayload()
+const router = useRouter()
+const { toast } = useToast()
+const locationApi = useLocationApi()
 
 const currentStep = ref(1)
 const totalSteps = 6
+const isSubmitting = ref(false)
+
+interface UploadedFile {
+  id?: string | number
+  url: string
+  alt?: string
+  filename?: string
+}
 
 const formData = ref({
   // Step 1: Basic Info
   name: '',
   description: '',
-  type: 'private',
+  type: 'residential',
 
   // Step 2: Location
-  address: '',
+  street: '',
   city: '',
   state: '',
   zipCode: '',
@@ -35,7 +50,7 @@ const formData = ref({
   amenities: [] as string[],
 
   // Step 4: Photos
-  photos: [] as string[],
+  photos: [] as UploadedFile[],
 
   // Step 5: Pricing
   pricePerMinute: '',
@@ -49,35 +64,25 @@ const formData = ref({
 })
 
 const bathroomTypes = [
-  { value: 'private', label: 'Private Bathroom', description: 'Exclusive access, no shared facilities' },
-  { value: 'ensuite', label: 'En-Suite', description: 'Attached to a private room' },
-  { value: 'shared', label: 'Shared Bathroom', description: 'Shared facilities in a common area' },
-  { value: 'powder', label: 'Powder Room', description: 'Half bathroom, no shower/tub' }
+  { value: 'residential', label: 'Residential', description: 'Private home or apartment bathroom' },
+  { value: 'commercial', label: 'Commercial', description: 'Office or business restroom' },
+  { value: 'restaurant', label: 'Restaurant/Cafe', description: 'Dining venue restroom' },
+  { value: 'hotel', label: 'Hotel/Hospitality', description: 'Hotel or lodging facilities' }
 ]
 
 const availableAmenities = [
-  'WiFi',
-  'Shower',
-  'Bathtub',
-  'Toiletries',
-  'Hair Dryer',
-  'Towels',
-  'Toilet Paper',
-  'Hand Soap',
-  'Body Wash',
-  'Shampoo',
-  'Conditioner',
-  'Mirror',
-  'Air Conditioning',
-  'Heating',
-  'Premium Products',
-  'Wheelchair Accessible',
-  'Baby Changing Table',
-  'Bidet',
-  'Rain Shower',
-  'Steam Shower',
-  'Jacuzzi',
-  'Natural Light'
+  { value: 'wheelchair', label: 'Wheelchair Accessible' },
+  { value: 'baby_changing', label: 'Baby Changing Station' },
+  { value: 'shower', label: 'Shower' },
+  { value: 'bidet', label: 'Bidet' },
+  { value: 'air_freshener', label: 'Air Freshener' },
+  { value: 'hand_dryer', label: 'Hand Dryer' },
+  { value: 'paper_towels', label: 'Paper Towels' },
+  { value: 'feminine', label: 'Feminine Products' },
+  { value: 'mirror', label: 'Mirror' },
+  { value: 'climate', label: 'Climate Controlled' },
+  { value: 'private', label: 'Private' },
+  { value: 'gender_neutral', label: 'Gender Neutral' }
 ]
 
 const daysOfWeek = [
@@ -98,6 +103,14 @@ const steps = [
   { number: 5, title: 'Pricing', icon: DollarSign },
   { number: 6, title: 'Review', icon: Calendar }
 ]
+
+const selectedTypeLabel = computed(() => {
+  return bathroomTypes.find(type => type.value === formData.value.type)?.label || formData.value.type
+})
+
+const getAmenityLabel = (value: string) => {
+  return availableAmenities.find(amenity => amenity.value === value)?.label || value
+}
 
 const nextStep = () => {
   if (currentStep.value < totalSteps) {
@@ -129,10 +142,87 @@ const toggleDay = (day: string) => {
   }
 }
 
-const submitForm = () => {
-  // Handle form submission
-  console.log('Form submitted:', formData.value)
-  navigateTo('/manage/properties')
+const submitForm = async () => {
+  if (isSubmitting.value) return
+  isSubmitting.value = true
+
+  try {
+    const photoIds = formData.value.photos
+      .map(photo => photo.id)
+      .filter(Boolean) as Array<string | number>
+
+    if (photoIds.length === 0) {
+      toast.warning('Please upload at least one photo')
+      isSubmitting.value = false
+      return
+    }
+
+    const addressParts = [
+      formData.value.street,
+      formData.value.city,
+      formData.value.state,
+      formData.value.zipCode,
+    ]
+      .map(part => part.trim())
+      .filter(Boolean)
+    const addressQuery = addressParts.join(', ')
+
+    if (!addressQuery) {
+      toast.warning('Please provide a complete address')
+      isSubmitting.value = false
+      return
+    }
+
+    const geocodeResponse = await locationApi.search({ text: addressQuery })
+    const bestMatch = geocodeResponse?.results?.[0]
+    if (!bestMatch) {
+      toast.error('Unable to locate that address. Please double-check it.')
+      isSubmitting.value = false
+      return
+    }
+
+    const coordinates: [number, number] = [bestMatch.lng, bestMatch.lat]
+
+    // Create property object
+    const propertyData = {
+      name: formData.value.name,
+      description: formData.value.description,
+      type: formData.value.type,
+      location: {
+        address: formData.value.street,
+        city: formData.value.city,
+        state: formData.value.state,
+        zipCode: formData.value.zipCode,
+        country: 'US',
+        coordinates
+      },
+      pricePerMinute: Math.round(parseFloat(formData.value.pricePerMinute) * 100), // Convert to cents
+      minimumDuration: parseInt(formData.value.minimumDuration),
+      maximumDuration: parseInt(formData.value.maximumDuration),
+      amenities: formData.value.amenities,
+      photos: photoIds.map(id => ({ image: id })),
+      availability: {
+        instantBooking: formData.value.instantBooking,
+        advanceNotice: parseInt(formData.value.advanceNotice),
+        schedule: formData.value.availableDays.map(day => ({
+          day,
+          enabled: true,
+          startTime: '08:00',
+          endTime: '22:00'
+        }))
+      },
+      owner: auth.user.value!.id,
+      status: 'pending'
+    }
+
+    const newProperty = await payload.create('properties', propertyData)
+    toast.success('Property created successfully!')
+    router.push(`/manage/properties/${newProperty.id}`)
+  } catch (error) {
+    console.error('Failed to create property:', error)
+    toast.error('Failed to create property. Please try again.')
+    isSubmitting.value = false
+  }
 }
 </script>
 
@@ -259,7 +349,7 @@ const submitForm = () => {
         <div>
           <label class="block text-sm font-medium text-gray-700 mb-2">Street Address</label>
           <input
-            v-model="formData.address"
+            v-model="formData.street"
             type="text"
             placeholder="123 Main Street"
             class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
@@ -317,19 +407,19 @@ const submitForm = () => {
         <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
           <button
             v-for="amenity in availableAmenities"
-            :key="amenity"
-            @click="toggleAmenity(amenity)"
+            :key="amenity.value"
+            @click="toggleAmenity(amenity.value)"
             :class="[
               'p-4 border-2 rounded-xl text-left transition-all',
-              formData.amenities.includes(amenity)
+              formData.amenities.includes(amenity.value)
                 ? 'border-blue-600 bg-blue-50 text-blue-900'
                 : 'border-gray-200 hover:border-gray-300 text-gray-700'
             ]"
           >
             <div class="flex items-center justify-between">
-              <span class="text-sm font-medium">{{ amenity }}</span>
+              <span class="text-sm font-medium">{{ amenity.label }}</span>
               <Check
-                v-if="formData.amenities.includes(amenity)"
+                v-if="formData.amenities.includes(amenity.value)"
                 class="w-4 h-4 text-blue-600"
               />
             </div>
@@ -348,26 +438,12 @@ const submitForm = () => {
         <h2 class="text-2xl font-bold text-gray-900">Property Photos</h2>
         <p class="text-gray-600">Upload high-quality photos of your bathroom</p>
 
-        <div class="border-2 border-dashed border-gray-300 rounded-xl p-12 text-center hover:border-blue-500 transition-colors cursor-pointer">
-          <Upload class="w-12 h-12 text-gray-400 mx-auto mb-4" />
-          <h3 class="text-lg font-semibold text-gray-900 mb-2">Upload Photos</h3>
-          <p class="text-sm text-gray-600 mb-4">
-            Drag and drop photos here, or click to browse
-          </p>
-          <button class="px-6 py-3 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 transition-colors">
-            Choose Files
-          </button>
-        </div>
-
-        <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <div
-            v-for="i in 4"
-            :key="i"
-            class="aspect-square bg-gray-100 rounded-lg flex items-center justify-center border-2 border-dashed border-gray-300"
-          >
-            <ImageIcon class="w-8 h-8 text-gray-400" />
-          </div>
-        </div>
+        <ImageUpload
+          v-model="formData.photos"
+          multiple
+          :max-files="10"
+          :allow-url="false"
+        />
 
         <div class="p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
           <p class="text-sm text-yellow-800">
@@ -493,7 +569,7 @@ const submitForm = () => {
               </div>
               <div class="flex justify-between">
                 <span class="text-gray-600">Type:</span>
-                <span class="font-medium text-gray-900">{{ formData.type }}</span>
+                <span class="font-medium text-gray-900">{{ selectedTypeLabel }}</span>
               </div>
             </div>
           </div>
@@ -501,7 +577,7 @@ const submitForm = () => {
           <div class="p-6 bg-gray-50 rounded-xl">
             <h3 class="font-semibold text-gray-900 mb-4">Location</h3>
             <div class="text-sm text-gray-700">
-              {{ formData.address || 'Address not set' }}<br>
+              {{ formData.street || 'Address not set' }}<br>
               {{ formData.city }}, {{ formData.state }} {{ formData.zipCode }}
             </div>
           </div>
@@ -514,7 +590,7 @@ const submitForm = () => {
                 :key="amenity"
                 class="px-3 py-1 bg-blue-100 text-blue-700 text-sm rounded-full"
               >
-                {{ amenity }}
+                {{ getAmenityLabel(amenity) }}
               </span>
               <span v-if="formData.amenities.length === 0" class="text-sm text-gray-500">
                 No amenities selected
@@ -566,10 +642,11 @@ const submitForm = () => {
       <button
         v-else
         @click="submitForm"
-        class="inline-flex items-center gap-2 px-6 py-3 bg-green-600 text-white font-medium rounded-xl hover:bg-green-700 transition-colors shadow-sm hover:shadow-md"
+        :disabled="isSubmitting"
+        class="inline-flex items-center gap-2 px-6 py-3 bg-green-600 text-white font-medium rounded-xl hover:bg-green-700 transition-colors shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
       >
         <Save class="w-5 h-5" />
-        Submit Listing
+        {{ isSubmitting ? 'Creating...' : 'Submit Listing' }}
       </button>
     </div>
   </div>

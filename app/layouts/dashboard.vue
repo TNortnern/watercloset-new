@@ -86,12 +86,17 @@ interface Props {
 
 const props = withDefaults(defineProps<Props>(), {
   navigationItems: () => [],
-  user: () => ({
-    name: 'John Doe',
-    email: 'john@example.com',
-    initials: 'JD',
-    role: 'user'
-  })
+})
+
+// Get real user from auth if not provided as prop
+const { user: authUser, userInitials, displayName, logout } = useAuth()
+
+const user = computed(() => props.user || {
+  name: displayName.value,
+  email: authUser.value?.email || '',
+  initials: userInitials.value,
+  role: authUser.value?.role || 'user',
+  avatar: authUser.value?.avatar?.url
 })
 
 const sidebarOpen = ref(false)
@@ -118,10 +123,7 @@ const mobileNavigationItems = computed(() => {
   ).slice(0, 4) // Show max 4 items on mobile bottom nav
 })
 
-const handleLogout = () => {
-  console.log('Logout clicked')
-  // Add logout logic here - will be implemented with backend
-  // For now, just navigate to login
-  navigateTo('/login')
+const handleLogout = async () => {
+  await logout()
 }
 </script>

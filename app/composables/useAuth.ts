@@ -7,15 +7,21 @@ interface User {
   email: string
   firstName: string
   lastName: string
+  phone?: string
+  bio?: string
   role: 'user' | 'provider' | 'admin'
   avatar?: {
     url: string
   }
+  favorites?: string[] | Array<{ id: string }>
   providerInfo?: {
     businessName?: string
+    businessType?: string
     stripeOnboarded?: boolean
+    stripeAccountId?: string
     verified?: boolean
   }
+  createdAt?: string
 }
 
 export const useAuth = () => {
@@ -55,7 +61,7 @@ export const useAuth = () => {
   }
 
   /**
-   * Register a new user
+   * Register a new user and auto-login
    */
   const register = async (data: {
     email: string
@@ -65,8 +71,13 @@ export const useAuth = () => {
     role?: 'user' | 'provider'
   }) => {
     try {
-      const response = await payload.register(data)
-      user.value = response.user
+      // Create the user account
+      await payload.register(data)
+
+      // Auto-login to get the auth cookie
+      const loginResponse = await payload.login(data.email, data.password)
+      user.value = loginResponse.user
+
       return { success: true }
     } catch (error: any) {
       return {

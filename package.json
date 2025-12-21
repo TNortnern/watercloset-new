@@ -12,8 +12,9 @@
     "build:api": "pnpm --filter @watercloset/api build",
     "dev:pwa": "VITE_PLUGIN_PWA=true nuxt dev",
     "generate": "nuxt generate",
-    "prepare": "nuxt prepare",
+    "prepare": "nuxt prepare && husky install",
     "preview": "nuxt preview",
+    "smoke": "node scripts/smoke.mjs",
     "start": "node .output/server/index.mjs",
     "start:generate": "npx serve .output/public",
     "lint": "turbo run lint",
@@ -22,7 +23,6 @@
     "db:stop": "docker compose down"
   },
   "devDependencies": {
-    "turbo": "^2.3.0",
     "@antfu/eslint-config": "catalog:dev",
     "@iconify-json/carbon": "catalog:icons",
     "@iconify-json/twemoji": "catalog:icons",
@@ -40,10 +40,12 @@
     "@vueuse/nuxt": "catalog:build",
     "eslint": "catalog:dev",
     "eslint-plugin-format": "catalog:dev",
+    "husky": "^9.1.7",
     "nuxt": "catalog:build",
     "pinia": "catalog:frontend",
     "shadcn-nuxt": "^2.4.3",
     "tailwindcss-animate": "^1.0.7",
+    "turbo": "^2.3.0",
     "typescript": "catalog:dev",
     "unocss": "catalog:build",
     "vue": "catalog:frontend",
@@ -57,10 +59,12 @@
     "vite": "catalog:build"
   },
   "dependencies": {
+    "@stripe/stripe-js": "^8.6.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "lucide-vue-next": "^0.561.0",
     "radix-vue": "^1.9.17",
-    "tailwind-merge": "^3.4.0"
+    "tailwind-merge": "^3.4.0",
+    "vue3-google-map": "^0.26.0"
   }
 }

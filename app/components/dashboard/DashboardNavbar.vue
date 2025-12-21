@@ -39,7 +39,7 @@
         <div class="relative">
           <button
             class="p-2 rounded-lg hover:bg-slate-100 transition-colors relative"
-            @click="notificationsOpen = !notificationsOpen"
+            @click.stop="notificationsOpen = !notificationsOpen"
           >
             <Bell class="w-5 h-5 text-slate-600" />
             <!-- Notification Badge -->
@@ -111,10 +111,10 @@
         <div class="relative">
           <button
             class="flex items-center space-x-2 p-1.5 rounded-lg hover:bg-slate-100 transition-colors"
-            @click="userMenuOpen = !userMenuOpen"
+            @click.stop="userMenuOpen = !userMenuOpen"
           >
             <div class="w-8 h-8 rounded-full bg-gradient-to-br from-cyan-400 to-teal-500 flex items-center justify-center text-white font-semibold text-sm">
-              JD
+              {{ userInitials }}
             </div>
             <ChevronDown class="w-4 h-4 text-slate-600 hidden sm:block" />
           </button>
@@ -135,8 +135,8 @@
             >
               <!-- User Info -->
               <div class="px-4 py-3 border-b border-slate-200">
-                <p class="text-sm font-semibold text-slate-900">John Doe</p>
-                <p class="text-xs text-slate-500 mt-0.5">john@example.com</p>
+                <p class="text-sm font-semibold text-slate-900">{{ displayName }}</p>
+                <p class="text-xs text-slate-500 mt-0.5">{{ user?.email }}</p>
               </div>
 
               <!-- Menu Items -->
@@ -201,62 +201,27 @@ defineEmits<{
   'toggle-sidebar': []
 }>()
 
+const { user, userInitials, displayName, logout } = useAuth()
+
 const searchQuery = ref('')
 const notificationsOpen = ref(false)
 const userMenuOpen = ref(false)
 const mobileSearchOpen = ref(false)
 
-const unreadCount = ref(3)
-
-const notifications = ref([
-  {
-    id: 1,
-    message: 'New booking request for Premium Suite',
-    time: '5 minutes ago',
-    read: false,
-    icon: Calendar,
-    iconBg: 'bg-cyan-100',
-    iconColor: 'text-cyan-600'
-  },
-  {
-    id: 2,
-    message: 'You have a new message from Sarah',
-    time: '1 hour ago',
-    read: false,
-    icon: MessageSquare,
-    iconBg: 'bg-purple-100',
-    iconColor: 'text-purple-600'
-  },
-  {
-    id: 3,
-    message: 'Your listing "Executive Washroom" was approved',
-    time: '2 hours ago',
-    read: false,
-    icon: Calendar,
-    iconBg: 'bg-green-100',
-    iconColor: 'text-green-600'
-  },
-  {
-    id: 4,
-    message: 'Payment received: $50.00',
-    time: '1 day ago',
-    read: true,
-    icon: CreditCard,
-    iconBg: 'bg-blue-100',
-    iconColor: 'text-blue-600'
-  },
-])
+// TODO: Fetch real notifications from API
+const unreadCount = ref(0)
+const notifications = ref<any[]>([])
 
 const userMenuItems = [
   { name: 'Your Profile', href: '/dashboard/profile', icon: User },
-  { name: 'Settings', href: '/dashboard/settings', icon: Settings },
-  { name: 'Billing', href: '/dashboard/billing', icon: CreditCard },
-  { name: 'Help & Support', href: '/help', icon: HelpCircle },
+  { name: 'Settings', href: '/manage/settings', icon: Settings },
+  { name: 'Billing', href: '/manage/earnings', icon: CreditCard },
+  { name: 'Help & Support', href: '/contact', icon: HelpCircle },
 ]
 
-const handleSignOut = () => {
-  console.log('Sign out clicked')
-  // Add sign out logic here
+const handleSignOut = async () => {
+  userMenuOpen.value = false
+  await logout()
 }
 
 // Click outside directive (composable)

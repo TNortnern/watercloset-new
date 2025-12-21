@@ -6,10 +6,115 @@ import { Label } from '@/components/ui/label'
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Search, MapPin, Calendar as CalendarIcon, Map as MapIcon, ShieldCheck, HeartHandshake, Accessibility, CheckCircle2, Star, User, Clock, Wallet, Shield, Heart } from 'lucide-vue-next'
+import LocationSearch from '@/components/search/LocationSearch.vue'
+import PropertiesNearMe from '@/components/home/PropertiesNearMe.vue'
+import HomeMap from '@/components/home/HomeMap.vue'
 
 definePageMeta({
   layout: 'home',
 })
+
+const router = useRouter()
+const homeStore = useHomeStore()
+const { searchNearby } = usePayload()
+
+// Map state
+const nearbyProperties = ref<any[]>([])
+const isMapLoading = ref(false)
+const mapCenter = computed(() => {
+  if (homeStore.address?.coordinates) {
+    return {
+      lat: homeStore.address.coordinates.latitude,
+      lng: homeStore.address.coordinates.longitude,
+    }
+  }
+  // Default to LA if no location
+  return { lat: 34.0522, lng: -118.2437 }
+})
+
+// Fetch nearby properties for the map
+async function fetchNearbyProperties() {
+  if (!homeStore.address?.coordinates) return
+
+  isMapLoading.value = true
+  try {
+    const { latitude, longitude } = homeStore.address.coordinates
+    const response = await searchNearby(latitude, longitude, homeStore.radius)
+    nearbyProperties.value = response?.docs || []
+  } catch (error) {
+    console.error('Error fetching nearby properties:', error)
+    nearbyProperties.value = []
+  } finally {
+    isMapLoading.value = false
+  }
+}
+
+// Auto-detect location on mount
+onMounted(async () => {
+  // Only detect if we don't already have a location
+  if (!homeStore.address) {
+    await homeStore.detectLocation()
+  }
+  // Fetch properties after location is set
+  if (homeStore.address) {
+    await fetchNearbyProperties()
+  }
+})
+
+// Watch for location changes and refetch
+watch(
+  () => homeStore.address,
+  async () => {
+    await fetchNearbyProperties()
+  },
+  { deep: true }
+)
+
+// Handle location selection from hero search
+const selectedLocation = ref<{ lat: number; lng: number; formatted: string } | null>(null)
+
+async function handleLocationSelect(location: { lat: number; lng: number; formatted: string }) {
+  selectedLocation.value = location
+  // Update the home store so map and PropertiesNearMe update
+  homeStore.setAddress({
+    coordinates: { latitude: location.lat, longitude: location.lng },
+    description: location.formatted,
+    title: location.formatted,
+    location: {
+      formatted_address: location.formatted,
+      lat: location.lat,
+      lng: location.lng,
+    },
+  })
+}
+
+function navigateToSearch() {
+  if (selectedLocation.value) {
+    router.push({
+      path: '/search',
+      query: {
+        lat: selectedLocation.value.lat.toString(),
+        lng: selectedLocation.value.lng.toString(),
+        location: selectedLocation.value.formatted,
+      },
+    })
+  } else if (homeStore.address) {
+    router.push({
+      path: '/search',
+      query: {
+        lat: homeStore.address.coordinates.latitude.toString(),
+        lng: homeStore.address.coordinates.longitude.toString(),
+        location: homeStore.address.title,
+      },
+    })
+  } else {
+    router.push('/search')
+  }
+}
+
+function navigateToProvider() {
+  router.push('/provider/dashboard')
+}
 
 const faqs = [
   {
@@ -82,11 +187,11 @@ const accessibilityFeatures = [
               MyWaterCloset connects people who need a restroom with those who have one to share. A simple, dignified solution for a universal need.
             </p>
             <div class="flex flex-col sm:flex-row gap-4 pt-2">
-              <Button size="xl" class="h-14 px-8 text-lg rounded-full shadow-lg shadow-primary/20">
+              <Button size="xl" class="h-14 px-8 text-lg rounded-full shadow-lg shadow-primary/20" @click="navigateToSearch">
                 <MapPin class="mr-2 h-5 w-5" />
                 Find a Restroom
               </Button>
-              <Button size="xl" variant="outline" class="h-14 px-8 text-lg rounded-full bg-white/50 border-slate-200">
+              <Button size="xl" variant="outline" class="h-14 px-8 text-lg rounded-full bg-white/50 border-slate-200" @click="navigateToProvider">
                 <MapIcon class="mr-2 h-5 w-5" />
                 Become a Provider
               </Button>
@@ -105,41 +210,48 @@ const accessibilityFeatures = [
           </div>
 
           <div class="relative" v-motion-fade-visible-once>
-             <!-- Decorative Map Background -->
-             <div class="aspect-square max-w-lg mx-auto bg-white rounded-[2.5rem] shadow-2xl shadow-slate-200/50 overflow-hidden relative border border-slate-100">
-                <img src="/images/blocks/maps/map-1.png" class="w-full h-full object-cover opacity-40" alt="Map" />
-                
-                <!-- Mock Pins -->
-                <div class="absolute top-[20%] left-[25%]" v-motion-pop-visible-once :delay="200">
-                   <div class="w-10 h-10 rounded-full bg-primary flex items-center justify-center shadow-lg transform hover:scale-110 transition-transform cursor-pointer text-white font-bold">
-                     Free
-                   </div>
-                </div>
-                <div class="absolute top-[45%] left-[60%]" v-motion-pop-visible-once :delay="400">
-                   <div class="w-10 h-10 rounded-full bg-slate-800 flex items-center justify-center shadow-lg transform hover:scale-110 transition-transform cursor-pointer text-white font-bold">
-                     
-                   </div>
-                </div>
-                <div class="absolute top-[65%] left-[30%]" v-motion-pop-visible-once :delay="600">
-                   <div class="w-10 h-10 rounded-full bg-primary flex items-center justify-center shadow-lg transform hover:scale-110 transition-transform cursor-pointer text-white font-bold">
-                     <Accessibility class="h-5 w-5" />
-                   </div>
-                </div>
+             <!-- Interactive Map -->
+             <div class="aspect-square max-w-lg lg:max-w-xl xl:max-w-2xl mx-auto bg-white rounded-[2.5rem] shadow-2xl shadow-slate-200/50 overflow-hidden relative border border-slate-100">
+                <HomeMap
+                  :properties="nearbyProperties"
+                  :center="mapCenter"
+                  :is-loading="isMapLoading || homeStore.isLoading"
+                  :user-location-title="homeStore.address?.title"
+                />
+             </div>
 
-                <!-- Search Card Overlay -->
-                <div class="absolute bottom-6 left-6 right-6 bg-white/90 backdrop-blur-md rounded-2xl p-5 shadow-lg border border-white/50" v-motion-slide-visible-once-bottom :delay="800">
-                  <div class="space-y-4">
-                    <div class="relative">
-                      <Search class="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                      <Input placeholder="Search by location..." class="pl-10 bg-transparent border-slate-200" />
-                    </div>
-                    <Button class="w-full rounded-xl">Search Nearby</Button>
-                  </div>
-                </div>
+             <!-- Search Card Overlay - positioned relative to map container -->
+             <div class="max-w-lg mx-auto -mt-24 relative z-20" v-motion-slide-visible-once-bottom :delay="300">
+               <div class="mx-6 bg-white/90 backdrop-blur-md rounded-2xl p-5 shadow-lg border border-white/50">
+                 <div class="space-y-4">
+                   <LocationSearch
+                     :model-value="homeStore.address?.title || ''"
+                     placeholder="Search by location..."
+                     @location-select="handleLocationSelect"
+                   />
+                   <div class="flex items-center gap-2">
+                     <Button class="flex-1 rounded-xl" @click="navigateToSearch">
+                       <Search class="mr-2 h-4 w-4" />
+                       Full Search View
+                     </Button>
+                   </div>
+                   <p v-if="homeStore.isLoading" class="text-xs text-center text-slate-500">
+                     Detecting your location...
+                   </p>
+                   <p v-else-if="homeStore.address && nearbyProperties.length > 0" class="text-xs text-center text-slate-500">
+                     {{ nearbyProperties.length }} bathroom{{ nearbyProperties.length === 1 ? '' : 's' }} near {{ homeStore.address.title?.split(',')[0] }}
+                   </p>
+                 </div>
+               </div>
              </div>
           </div>
         </div>
       </div>
+    </section>
+
+    <!-- Properties Near Me - directly after hero -->
+    <section class="py-12 bg-white">
+      <PropertiesNearMe />
     </section>
 
     <!-- Experience the Difference (Feature Blocks) -->
@@ -347,9 +459,6 @@ const accessibilityFeatures = [
         </Tabs>
       </div>
     </section>
-
-    <!-- Properties Near Me (Rich Grid) -->
-    <!-- ... (Keep this section) -->
 
     <!-- Accessibility -->
     <section class="py-24 bg-slate-900 text-white overflow-hidden relative" v-motion-fade-visible-once>

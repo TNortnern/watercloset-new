@@ -11,171 +11,141 @@ import {
 
 definePageMeta({
   layout: 'dashboard-provider',
+  middleware: 'provider'
 })
+
+const auth = useAuth()
+const payload = usePayload()
+
+interface Property {
+  id: string
+  name: string
+}
+
+interface Review {
+  id: string
+  user: { id: string, firstName: string, lastName: string }
+  property: { id: string, name: string }
+  rating: number
+  comment: string
+  createdAt: string
+  helpful?: number
+  response?: {
+    comment?: string
+    respondedAt?: string
+  }
+}
 
 const searchQuery = ref('')
 const selectedProperty = ref('all')
 const selectedRating = ref('all')
 
-const ratingStats = {
-  average: 4.8,
-  total: 156,
-  breakdown: [
-    { stars: 5, count: 125, percentage: 80 },
-    { stars: 4, count: 23, percentage: 15 },
-    { stars: 3, count: 6, percentage: 4 },
-    { stars: 2, count: 2, percentage: 1 },
-    { stars: 1, count: 0, percentage: 0 }
-  ]
-}
+// Fetch provider's properties for filter
+const { data: propertiesData } = await useAsyncData('reviews-properties', async () => {
+  if (!auth.user.value?.id) return null
+  return await payload.find<Property>('properties', {
+    where: { owner: { equals: auth.user.value.id } },
+    depth: 0,
+    limit: 100
+  })
+})
 
-const properties = [
-  { value: 'all', label: 'All Properties' },
-  { value: '1', label: 'Downtown Luxury Suite' },
-  { value: '2', label: 'Spa Retreat Bathroom' },
-  { value: '3', label: 'Modern Minimalist Washroom' },
-  { value: '4', label: 'Executive Suite Bath' }
-]
+const allProperties = computed(() => propertiesData.value?.docs || [])
 
-const reviews = [
-  {
-    id: 1,
-    guest: {
-      name: 'Sarah Johnson',
-      avatar: 'SJ'
+// Build properties filter options
+const properties = computed(() => {
+  const options = [{ value: 'all', label: 'All Properties' }]
+  allProperties.value.forEach(prop => {
+    options.push({ value: prop.id, label: prop.name })
+  })
+  return options
+})
+
+// Fetch all reviews for provider's properties
+const { data: reviewsData } = await useAsyncData('provider-reviews-page', async () => {
+  if (!auth.user.value?.id) return null
+  const propertyIds = allProperties.value.map(p => p.id)
+  if (propertyIds.length === 0) return null
+
+  return await payload.find<Review>('reviews', {
+    where: {
+      property: { in: propertyIds }
     },
-    property: 'Downtown Luxury Suite',
-    rating: 5,
-    comment: 'Absolutely amazing experience! The bathroom was spotless, beautifully designed, and had all the amenities I needed. The host was very responsive and made check-in seamless. Highly recommend!',
-    date: '2025-12-15',
-    helpful: 12,
-    responded: true
-  },
-  {
-    id: 2,
-    guest: {
-      name: 'Michael Chen',
-      avatar: 'MC'
-    },
-    property: 'Spa Retreat Bathroom',
-    rating: 5,
-    comment: 'Perfect for a quick refresh during my busy day. The spa-like atmosphere was incredibly relaxing. Great location and very clean. Will definitely book again!',
-    date: '2025-12-14',
-    helpful: 8,
-    responded: false
-  },
-  {
-    id: 3,
-    guest: {
-      name: 'Emily Rodriguez',
-      avatar: 'ER'
-    },
-    property: 'Modern Minimalist Washroom',
-    rating: 4,
-    comment: 'Really nice space with a modern aesthetic. Everything was clean and functional. Only minor issue was the door lock was a bit tricky, but overall a great experience.',
-    date: '2025-12-13',
-    helpful: 5,
-    responded: true
-  },
-  {
-    id: 4,
-    guest: {
-      name: 'David Kim',
-      avatar: 'DK'
-    },
-    property: 'Executive Suite Bath',
-    rating: 5,
-    comment: 'Premium quality all around. The attention to detail is impressive. Perfect for business travelers who need a quiet, clean space. The amenities provided were top-notch.',
-    date: '2025-12-12',
-    helpful: 15,
-    responded: true
-  },
-  {
-    id: 5,
-    guest: {
-      name: 'Lisa Thompson',
-      avatar: 'LT'
-    },
-    property: 'Garden View Powder Room',
-    rating: 5,
-    comment: 'Lovely little powder room with a beautiful garden view. So peaceful and well-maintained. The host was friendly and the whole experience was delightful.',
-    date: '2025-12-11',
-    helpful: 6,
-    responded: false
-  },
-  {
-    id: 6,
-    guest: {
-      name: 'James Wilson',
-      avatar: 'JW'
-    },
-    property: 'Downtown Luxury Suite',
-    rating: 4,
-    comment: 'Great location in the heart of downtown. Very convenient for my meetings. The space was clean and had everything I needed. Would have given 5 stars but the water pressure could be better.',
-    date: '2025-12-10',
-    helpful: 4,
-    responded: true
-  },
-  {
-    id: 7,
-    guest: {
-      name: 'Maria Garcia',
-      avatar: 'MG'
-    },
-    property: 'Spa Retreat Bathroom',
-    rating: 5,
-    comment: 'This is my third time booking and it never disappoints! The spa products are luxurious and the bathtub is amazing. Perfect for unwinding after a long day.',
-    date: '2025-12-09',
-    helpful: 10,
-    responded: true
-  },
-  {
-    id: 8,
-    guest: {
-      name: 'Robert Taylor',
-      avatar: 'RT'
-    },
-    property: 'Modern Minimalist Washroom',
-    rating: 5,
-    comment: 'Clean, modern, and exactly as described. The minimalist design is beautiful and calming. Host was great with communication. Excellent value for money.',
-    date: '2025-12-08',
-    helpful: 7,
-    responded: false
-  },
-  {
-    id: 9,
-    guest: {
-      name: 'Jennifer Lee',
-      avatar: 'JL'
-    },
-    property: 'Executive Suite Bath',
-    rating: 5,
-    comment: 'Outstanding! The privacy and quiet atmosphere were perfect for my needs. Everything was immaculate and the booking process was smooth. Highly professional host.',
-    date: '2025-12-07',
-    helpful: 9,
-    responded: true
-  },
-  {
-    id: 10,
-    guest: {
-      name: 'Thomas Brown',
-      avatar: 'TB'
-    },
-    property: 'Downtown Luxury Suite',
-    rating: 3,
-    comment: 'The space was nice but a bit smaller than expected from the photos. Still clean and functional, just not quite what I was anticipating. Host was responsive though.',
-    date: '2025-12-06',
-    helpful: 3,
-    responded: true
+    depth: 2,
+    limit: 500,
+    sort: '-createdAt'
+  })
+})
+
+const allReviews = computed(() => reviewsData.value?.docs || [])
+
+// Calculate rating stats
+const ratingStats = computed(() => {
+  const total = allReviews.value.length
+  if (total === 0) {
+    return {
+      average: 0,
+      total: 0,
+      breakdown: [
+        { stars: 5, count: 0, percentage: 0 },
+        { stars: 4, count: 0, percentage: 0 },
+        { stars: 3, count: 0, percentage: 0 },
+        { stars: 2, count: 0, percentage: 0 },
+        { stars: 1, count: 0, percentage: 0 }
+      ]
+    }
   }
-]
 
+  const totalRating = allReviews.value.reduce((sum, r) => sum + r.rating, 0)
+  const average = (totalRating / total).toFixed(1)
+
+  const breakdown = [5, 4, 3, 2, 1].map(stars => {
+    const count = allReviews.value.filter(r => r.rating === stars).length
+    const percentage = Math.round((count / total) * 100)
+    return { stars, count, percentage }
+  })
+
+  return {
+    average: parseFloat(average),
+    total,
+    breakdown
+  }
+})
+
+// Transform reviews for display
+const reviews = computed(() => {
+  return allReviews.value.map(review => {
+    const user = review.user
+    const property = review.property
+    const firstName = typeof user === 'object' ? user.firstName : ''
+    const lastName = typeof user === 'object' ? user.lastName : ''
+    const propertyName = typeof property === 'object' ? property.name : 'Unknown Property'
+    const propertyId = typeof property === 'object' ? property.id : ''
+    const createdAt = new Date(review.createdAt)
+
+    return {
+      id: review.id,
+      guest: {
+        name: `${firstName} ${lastName}`.trim(),
+        avatar: `${firstName.charAt(0)}${lastName.charAt(0)}`.toUpperCase()
+      },
+      property: propertyName,
+      propertyId,
+      rating: review.rating,
+      comment: review.comment,
+      date: createdAt.toISOString().split('T')[0],
+      helpful: review.helpful || 0,
+      responded: !!(review.response?.comment)
+    }
+  })
+})
+
+// Filter reviews
 const filteredReviews = computed(() => {
-  let filtered = reviews
+  let filtered = reviews.value
 
   if (selectedProperty.value !== 'all') {
-    const propertyName = properties.find(p => p.value === selectedProperty.value)?.label
-    filtered = filtered.filter(r => r.property === propertyName)
+    filtered = filtered.filter(r => r.propertyId === selectedProperty.value)
   }
 
   if (selectedRating.value !== 'all') {

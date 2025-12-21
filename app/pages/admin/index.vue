@@ -166,63 +166,120 @@ import { Users, Building2, Calendar, TrendingUp, Settings, AlertTriangle, BarCha
 
 definePageMeta({
   layout: 'dashboard-admin',
+  middleware: 'admin',
 })
 
-const stats = {
-  totalUsers: 8547,
-  totalProviders: 342,
-  totalBookings: 12834,
-  revenue: 45678
+const payload = usePayload()
+
+interface User {
+  id: string
+  role: 'user' | 'provider' | 'admin'
 }
 
-const alerts = [
-  { id: 1, message: '5 new properties pending approval', link: '/admin/properties' },
-  { id: 2, message: '3 refund requests awaiting review', link: '/admin/bookings' },
-  { id: 3, message: '2 reported properties require investigation', link: '/admin/properties' },
-]
+interface Property {
+  id: string
+  status: 'pending' | 'active' | 'inactive' | 'suspended'
+}
 
-const recentActivities = [
-  {
-    id: 1,
-    type: 'signup',
-    title: 'New User Signup',
-    description: 'Sarah Johnson joined the platform',
-    time: '5 minutes ago'
-  },
-  {
-    id: 2,
-    type: 'booking',
-    title: 'New Booking',
-    description: 'Michael Chen booked Premium Suite at Downtown Plaza',
-    time: '12 minutes ago'
-  },
-  {
-    id: 3,
-    type: 'refund',
-    title: 'Refund Request',
-    description: 'Emma Davis requested refund for booking #BC-12345',
-    time: '24 minutes ago'
-  },
-  {
-    id: 4,
-    type: 'property',
-    title: 'New Property Submitted',
-    description: 'Luxury Towers submitted property for approval',
-    time: '1 hour ago'
-  },
-  {
-    id: 5,
-    type: 'booking',
-    title: 'New Booking',
-    description: 'David Wilson booked Executive Lounge at City Center',
-    time: '2 hours ago'
-  },
-  {
-    id: 6,
-    type: 'signup',
-    title: 'New User Signup',
-    description: 'Jessica Martinez joined the platform',
-    time: '3 hours ago'
+interface Booking {
+  id: string
+  status: string
+  totalAmount: number
+  platformFee: number
+  user: any
+  property: any
+  createdAt: string
+}
+
+const stats = ref({
+  totalUsers: 0,
+  totalProviders: 0,
+  totalBookings: 0,
+  revenue: 0
+})
+
+const alerts = ref<Array<{ id: number; message: string; link: string }>>([])
+const recentActivities = ref<Array<any>>([])
+const loading = ref(true)
+
+// Fetch dashboard data
+onMounted(async () => {
+  try {
+    // Fetch all users
+    const usersResponse = await payload.find<User>('users', { limit: 1000 })
+    stats.value.totalUsers = usersResponse.totalDocs
+    stats.value.totalProviders = usersResponse.docs.filter(u => u.role === 'provider').length
+
+    // Fetch all properties
+    const propertiesResponse = await payload.find<Property>('properties', { limit: 1000 })
+    const pendingProperties = propertiesResponse.docs.filter(p => p.status === 'pending').length
+
+    // Fetch all bookings
+    const bookingsResponse = await payload.find<Booking>('bookings', { limit: 1000, depth: 2 })
+    stats.value.totalBookings = bookingsResponse.totalDocs
+
+    // Calculate revenue (sum of platform fees)
+    stats.value.revenue = Math.round(
+      bookingsResponse.docs.reduce((sum, b) => sum + (b.platformFee || 0), 0) / 100
+    )
+
+    // Count refund requests
+    const refundRequests = bookingsResponse.docs.filter(b => b.status === 'refunded' || b.status === 'cancelled').length
+
+    // Build alerts
+    if (pendingProperties > 0) {
+      alerts.value.push({
+        id: 1,
+        message: `${pendingProperties} new ${pendingProperties === 1 ? 'property' : 'properties'} pending approval`,
+        link: '/admin/properties?status=pending'
+      })
+    }
+
+    // Build recent activities from bookings and users
+    const recentBookings = bookingsResponse.docs
+      .filter(b => b.status === 'confirmed' || b.status === 'completed')
+      .slice(0, 3)
+      .map(b => ({
+        id: `booking-${b.id}`,
+        type: 'booking',
+        title: 'New Booking',
+        description: `${b.user?.firstName || 'User'} ${b.user?.lastName || ''} booked ${b.property?.name || 'property'}`,
+        time: formatTimeAgo(b.createdAt)
+      }))
+
+    const recentUsers = usersResponse.docs
+      .slice(0, 3)
+      .map(u => ({
+        id: `user-${u.id}`,
+        type: 'signup',
+        title: 'New User Signup',
+        description: `${(u as any).firstName || 'User'} ${(u as any).lastName || ''} joined the platform`,
+        time: formatTimeAgo((u as any).createdAt)
+      }))
+
+    recentActivities.value = [...recentBookings, ...recentUsers]
+      .sort((a, b) => {
+        // Simple sort by time string (this is approximate)
+        return a.time.localeCompare(b.time)
+      })
+      .slice(0, 6)
+
+  } catch (error) {
+    console.error('Failed to fetch dashboard data:', error)
+  } finally {
+    loading.value = false
   }
-]
+})
+
+// Helper function to format time ago
+function formatTimeAgo(dateString: string): string {
+  const date = new Date(dateString)
+  const now = new Date()
+  const seconds = Math.floor((now.getTime() - date.getTime()) / 1000)
+
+  if (seconds < 60) return `${seconds} seconds ago`
+  if (seconds < 3600) return `${Math.floor(seconds / 60)} minutes ago`
+  if (seconds < 86400) return `${Math.floor(seconds / 3600)} hours ago`
+  return `${Math.floor(seconds / 86400)} days ago`
+}
 </script>

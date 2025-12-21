@@ -30,3 +30,4 @@ apps/api/.env
 public/assets/fonts
 .nitro/
 .cache/
+.turbo/

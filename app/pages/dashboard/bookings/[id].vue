@@ -8,7 +8,14 @@
       </Button>
     </div>
 
-    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+    <div v-if="!booking && !pending" class="text-center py-12">
+      <p class="text-slate-600">Booking not found</p>
+      <Button class="mt-4" @click="navigateTo('/dashboard/bookings')">
+        Back to Bookings
+      </Button>
+    </div>
+
+    <div v-else-if="booking" class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
       <div>
         <h1 class="text-3xl font-bold text-slate-900">Booking Details</h1>
         <p class="mt-1 text-slate-600">Booking #{{ booking.id }}</p>
@@ -25,7 +32,7 @@
       </span>
     </div>
 
-    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+    <div v-if="booking" class="grid grid-cols-1 lg:grid-cols-3 gap-6">
       <!-- Main Content -->
       <div class="lg:col-span-2 space-y-6">
         <!-- Property Info -->
@@ -135,10 +142,10 @@
               </div>
               <div class="p-4 bg-slate-50 rounded-lg">
                 <p class="text-sm font-medium text-slate-900 mb-1">Access Code</p>
-                <p class="text-xs text-slate-600 mb-2">Will be sent 30 minutes before booking</p>
+                <p v-if="!booking.accessCode" class="text-xs text-slate-600 mb-2">Will be sent 30 minutes before booking</p>
                 <div class="flex items-center gap-2">
-                  <div class="px-4 py-2 bg-white border-2 border-dashed border-slate-300 rounded font-mono text-lg tracking-wider text-slate-400">
-                    ****
+                  <div class="px-4 py-2 bg-white border-2 border-dashed border-slate-300 rounded font-mono text-lg tracking-wider" :class="booking.accessCode ? 'text-slate-900' : 'text-slate-400'">
+                    {{ booking.accessCode || '****' }}
                   </div>
                 </div>
               </div>
@@ -166,6 +173,59 @@
               <Navigation class="w-4 h-4 mr-2" />
               Get Directions
             </Button>
+          </CardContent>
+        </Card>
+
+        <!-- Review Section (for completed bookings) -->
+        <Card v-if="booking.status === 'Completed' && !showReviewForm && !hasReview">
+          <CardHeader class="border-b border-slate-200">
+            <CardTitle class="flex items-center">
+              <Star class="w-5 h-5 mr-2 text-yellow-500" />
+              Leave a Review
+            </CardTitle>
+          </CardHeader>
+          <CardContent class="p-6">
+            <p class="text-sm text-slate-600 mb-4">
+              Share your experience to help other users and support the host.
+            </p>
+            <Button class="w-full" @click="showReviewForm = true">
+              <Star class="w-4 h-4 mr-2" />
+              Write Review
+            </Button>
+          </CardContent>
+        </Card>
+
+        <!-- Review Form -->
+        <Card v-if="showReviewForm && !hasReview">
+          <CardContent class="p-6">
+            <ReviewForm
+              :booking-id="bookingId"
+              :property-id="booking.propertyId"
+              :property-name="booking.name"
+              @success="handleReviewSuccess"
+              @cancel="showReviewForm = false"
+            />
+          </CardContent>
+        </Card>
+
+        <!-- Review Submitted -->
+        <Card v-if="hasReview">
+          <CardHeader class="border-b border-slate-200">
+            <CardTitle class="flex items-center">
+              <Star class="w-5 h-5 mr-2 text-yellow-500 fill-yellow-500" />
+              Your Review
+            </CardTitle>
+          </CardHeader>
+          <CardContent class="p-6">
+            <div class="bg-green-50 border border-green-200 rounded-lg p-4">
+              <div class="flex items-center gap-2">
+                <CheckCircle2 class="w-5 h-5 text-green-600" />
+                <p class="font-medium text-green-900">Review submitted successfully!</p>
+              </div>
+              <p class="text-sm text-green-700 mt-2">
+                Thank you for sharing your experience. Your review helps other users make informed decisions.
+              </p>
+            </div>
           </CardContent>
         </Card>
       </div>
@@ -299,7 +359,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
 import {
   ArrowLeft,
   Calendar as CalendarIcon,
@@ -318,57 +378,162 @@ import {
   CreditCard,
   MessageCircle,
   AlertCircle,
+  CheckCircle2,
 } from 'lucide-vue-next'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
+import ReviewForm from '@/components/ReviewForm.vue'
 
 definePageMeta({
   layout: 'dashboard-user',
 })
 
 const route = useRoute()
-const bookingId = route.params.id
+const payload = usePayload()
+const { toast } = useToast()
+const { confirm } = useConfirm()
+const bookingId = route.params.id as string
 
-// Mock booking data
-const booking = ref({
-  id: bookingId,
-  name: 'Luxury Downtown Restroom',
-  location: 'Manhattan, NY',
-  address: '123 Broadway, Manhattan, NY 10001',
-  date: 'Dec 18, 2025',
-  time: '2:00 PM - 2:30 PM',
-  duration: '30 minutes',
-  price: 15,
-  basePrice: 12,
-  serviceFee: 3,
-  status: 'Confirmed',
-  host: 'John Smith',
-  rating: 4.9,
-  reviews: 127,
-  reviewed: false,
-  paymentMethod: 'Visa •••• 4242',
-  amenities: ['Wheelchair Accessible', 'Baby Changing', 'Premium Toiletries', 'Climate Control'],
-  image: 'https://images.unsplash.com/photo-1552321554-5fefe8c9ef14?w=600&h=600&fit=crop',
+// Review state
+const showReviewForm = ref(false)
+const hasReview = ref(false)
+
+// Fetch booking details
+const { data: bookingData, pending, refresh } = await useAsyncData(
+  `booking-${bookingId}`,
+  async () => {
+    return await payload.findByID('bookings', bookingId, 2)
+  }
+)
+
+// Check if booking has been reviewed
+const { data: reviewData } = await useAsyncData(
+  `booking-review-${bookingId}`,
+  async () => {
+    try {
+      const result = await payload.find('reviews', {
+        where: {
+          booking: { equals: bookingId }
+        },
+        limit: 1
+      })
+      return result
+    } catch (error) {
+      console.error('Error fetching review:', error)
+      return null
+    }
+  }
+)
+
+// Set hasReview based on reviewData
+if (reviewData.value?.docs && reviewData.value.docs.length > 0) {
+  hasReview.value = true
+}
+
+// Transform booking data for display
+const booking = computed(() => {
+  if (!bookingData.value) return null
+
+  const b = bookingData.value
+  const property = b.property
+  const startTime = new Date(b.startTime)
+  const endTime = new Date(b.endTime)
+  const now = new Date()
+
+  // Determine display status
+  let displayStatus = 'Confirmed'
+  if (b.status === 'cancelled') {
+    displayStatus = 'Cancelled'
+  } else if (endTime < now) {
+    displayStatus = 'Completed'
+  } else if (b.status === 'confirmed') {
+    displayStatus = 'Confirmed'
+  }
+
+  // Get duration in minutes
+  const durationMs = endTime.getTime() - startTime.getTime()
+  const durationMins = Math.floor(durationMs / (1000 * 60))
+
+  // Get host name
+  const owner = property?.owner
+  const hostName = owner?.firstName && owner?.lastName
+    ? `${owner.firstName} ${owner.lastName}`
+    : 'Property Owner'
+
+  // Get full address
+  const addr = property?.address
+  const fullAddress = addr
+    ? `${addr.street || ''}, ${addr.city || ''}, ${addr.state || ''} ${addr.zipCode || ''}`.replace(/^,\s*/, '').replace(/,\s*,/g, ',')
+    : 'Address not available'
+
+  const propertyId = typeof property === 'string' ? property : property?.id
+
+  return {
+    id: b.id,
+    propertyId: propertyId,
+    name: property?.name || 'Unknown Property',
+    location: addr?.city && addr?.state ? `${addr.city}, ${addr.state}` : 'Location not available',
+    address: fullAddress,
+    date: startTime.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
+    time: `${startTime.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })} - ${endTime.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}`,
+    duration: `${durationMins} minutes`,
+    price: b.totalPrice || 0,
+    basePrice: b.basePrice || 0,
+    serviceFee: b.serviceFee || 0,
+    status: displayStatus,
+    host: hostName,
+    rating: property?.averageRating || 0,
+    reviews: property?.reviewCount || 0,
+    reviewed: hasReview.value,
+    paymentMethod: 'Card on file', // TODO: Get actual payment method if stored
+    amenities: property?.amenities || [],
+    image: property?.images?.[0]?.url || 'https://images.unsplash.com/photo-1552321554-5fefe8c9ef14?w=600&h=600&fit=crop',
+    accessCode: b.accessCode || null,
+    accessInstructions: property?.accessInstructions || 'Access instructions will be provided.',
+  }
 })
 
 // Actions
 const modifyBooking = () => {
-  alert('Modify booking functionality')
+  // TODO: Implement modify booking modal
+  toast.info('Modify booking functionality coming soon')
 }
 
-const cancelBooking = () => {
-  if (confirm('Are you sure you want to cancel this booking? This action cannot be undone.')) {
-    booking.value.status = 'Cancelled'
-    alert('Booking cancelled successfully')
+const cancelBooking = async () => {
+  const confirmed = await confirm({
+    title: 'Cancel Booking',
+    message: 'Are you sure you want to cancel this booking? This action cannot be undone.',
+    confirmText: 'Cancel Booking',
+    variant: 'destructive',
+  })
+
+  if (!confirmed) return
+
+  try {
+    await payload.update('bookings', bookingId, { status: 'cancelled' })
+    await refresh()
+    toast.success('Booking cancelled successfully')
+  } catch (error) {
+    console.error('Failed to cancel booking:', error)
+    toast.error('Failed to cancel booking. Please try again.')
   }
 }
 
 const leaveReview = () => {
-  alert('Leave review modal would open here')
+  showReviewForm.value = true
+}
+
+const handleReviewSuccess = async () => {
+  hasReview.value = true
+  showReviewForm.value = false
+
+  // Refresh booking data
+  await refresh()
 }
 
 const bookAgain = () => {
-  navigateTo('/bathrooms/' + bookingId)
+  // For now, redirect to search page
+  navigateTo('/search')
 }
 
 const contactHost = () => {
@@ -376,14 +541,17 @@ const contactHost = () => {
 }
 
 const viewHostProfile = () => {
-  alert('View host profile')
+  // TODO: Implement host profile view
+  toast.info('Host profile feature coming soon')
 }
 
 const contactSupport = () => {
-  alert('Contact support')
+  // TODO: Implement support contact
+  navigateTo('/contact')
 }
 
 const reportIssue = () => {
-  alert('Report issue form')
+  // TODO: Implement issue reporting
+  toast.info('Issue reporting feature coming soon')
 }
 </script>

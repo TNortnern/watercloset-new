@@ -99,7 +99,7 @@
           <div class="flex flex-col space-y-2 ml-6">
             <button
               v-if="application.status === 'pending'"
-              @click="console.log('Approve provider application:', application.id)"
+              @click="approveProvider(application.id)"
               class="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg text-sm font-medium transition-colors flex items-center space-x-2"
             >
               <Check class="w-4 h-4" />
@@ -107,7 +107,7 @@
             </button>
             <button
               v-if="application.status === 'pending'"
-              @click="console.log('Reject provider application:', application.id)"
+              @click="rejectProvider(application.id)"
               class="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg text-sm font-medium transition-colors flex items-center space-x-2"
             >
               <X class="w-4 h-4" />
@@ -236,14 +236,14 @@
           </button>
           <button
             v-if="selectedApplication.status === 'pending'"
-            @click="console.log('Reject provider application:', selectedApplication.id); selectedApplication = null"
+            @click="rejectProvider(selectedApplication.id)"
             class="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg text-sm font-medium transition-colors"
           >
             Reject Application
           </button>
           <button
             v-if="selectedApplication.status === 'pending'"
-            @click="console.log('Approve provider application:', selectedApplication.id); selectedApplication = null"
+            @click="approveProvider(selectedApplication.id)"
             class="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg text-sm font-medium transition-colors"
           >
             Approve Application
@@ -260,117 +260,174 @@ import { Shield, Calendar, Building2, Check, X, Eye, FileText } from 'lucide-vue
 
 definePageMeta({
   layout: 'dashboard-admin',
+  middleware: 'admin',
 })
+
+const payload = usePayload()
+const { toast } = useToast()
+const { confirm } = useConfirm()
+
+interface Property {
+  id: string
+  name: string
+  status: 'pending' | 'active' | 'inactive' | 'suspended'
+  owner: {
+    id: string
+    firstName: string
+    lastName: string
+    email: string
+    phone?: string
+    createdAt: string
+  }
+  createdAt: string
+}
 
 const activeTab = ref('pending')
-const selectedApplication = ref(null)
+const selectedApplication = ref<any>(null)
+const loading = ref(true)
+const properties = ref<Property[]>([])
 
-const tabs = [
-  { label: 'Pending', value: 'pending', count: 5 },
-  { label: 'Approved', value: 'approved', count: 12 },
-  { label: 'Rejected', value: 'rejected', count: 3 }
-]
+// Fetch properties with their owners
+onMounted(async () => {
+  await fetchProperties()
+})
 
-const applications = [
-  {
-    id: 1,
-    name: 'Luxury Towers Inc',
-    initials: 'LT',
-    email: 'contact@luxurytowers.com',
-    phone: '+1 (555) 123-4567',
-    submittedDate: 'Dec 15, 2024',
-    propertyCount: 3,
-    idVerified: true,
-    status: 'pending',
-    description: 'Premium commercial building with state-of-the-art facilities in downtown area. We specialize in high-end office spaces and executive lounges.'
-  },
-  {
-    id: 2,
-    name: 'Downtown Plaza',
-    initials: 'DP',
-    email: 'info@downtownplaza.com',
-    phone: '+1 (555) 234-5678',
-    submittedDate: 'Dec 12, 2024',
-    propertyCount: 5,
-    idVerified: true,
-    status: 'pending',
-    description: 'Multi-purpose commercial complex with retail, dining, and office spaces. Located in the heart of the business district.'
-  },
-  {
-    id: 3,
-    name: 'City Center Management',
-    initials: 'CC',
-    email: 'admin@citycenter.com',
-    phone: '+1 (555) 345-6789',
-    submittedDate: 'Dec 10, 2024',
-    propertyCount: 8,
-    idVerified: false,
-    status: 'pending',
-    description: 'Large-scale commercial property management company overseeing multiple buildings across the metropolitan area.'
-  },
-  {
-    id: 4,
-    name: 'Executive Suites Co',
-    initials: 'ES',
-    email: 'contact@executivesuites.com',
-    phone: '+1 (555) 456-7890',
-    submittedDate: 'Dec 8, 2024',
-    propertyCount: 2,
-    idVerified: true,
-    status: 'pending',
-    description: 'Boutique office building offering premium executive suites and meeting rooms with concierge services.'
-  },
-  {
-    id: 5,
-    name: 'Metro Business Park',
-    initials: 'MB',
-    email: 'info@metrobusinesspark.com',
-    phone: '+1 (555) 567-8901',
-    submittedDate: 'Dec 5, 2024',
-    propertyCount: 12,
-    idVerified: true,
-    status: 'pending',
-    description: 'Expansive business park with modern facilities, ample parking, and convenient access to public transportation.'
-  },
-  {
-    id: 6,
-    name: 'Riverside Commercial',
-    initials: 'RC',
-    email: 'contact@riversidecommercial.com',
-    phone: '+1 (555) 678-9012',
-    submittedDate: 'Nov 28, 2024',
-    propertyCount: 4,
-    idVerified: true,
-    status: 'approved',
-    description: 'Waterfront commercial properties with scenic views and modern amenities for businesses of all sizes.'
-  },
-  {
-    id: 7,
-    name: 'Tech Hub Buildings',
-    initials: 'TH',
-    email: 'admin@techhub.com',
-    phone: '+1 (555) 789-0123',
-    submittedDate: 'Nov 20, 2024',
-    propertyCount: 6,
-    idVerified: true,
-    status: 'approved',
-    description: 'Innovation-focused workspace designed for tech startups and established companies in the technology sector.'
-  },
-  {
-    id: 8,
-    name: 'Budget Office Spaces',
-    initials: 'BO',
-    email: 'info@budgetoffices.com',
-    phone: '+1 (555) 890-1234',
-    submittedDate: 'Nov 15, 2024',
-    propertyCount: 1,
-    idVerified: false,
-    status: 'rejected',
-    description: 'Affordable office solutions for small businesses. Application rejected due to incomplete documentation.'
+async function fetchProperties() {
+  try {
+    loading.value = true
+    const response = await payload.find<Property>('properties', {
+      limit: 1000,
+      depth: 2,
+      sort: '-createdAt'
+    })
+    properties.value = response.docs
+  } catch (error) {
+    console.error('Failed to fetch properties:', error)
+  } finally {
+    loading.value = false
   }
-]
+}
+
+// Group properties by owner to create "applications"
+const applications = computed(() => {
+  const ownerMap = new Map<string, any>()
+
+  properties.value.forEach(property => {
+    if (typeof property.owner === 'string') return
+
+    const ownerId = property.owner?.id
+    if (!ownerId) return
+
+    if (!ownerMap.has(ownerId)) {
+      const owner = property.owner
+      const firstName = owner.firstName || ''
+      const lastName = owner.lastName || ''
+      const initials = `${firstName.charAt(0)}${lastName.charAt(0)}`.toUpperCase() || 'XX'
+
+      ownerMap.set(ownerId, {
+        id: ownerId,
+        name: `${firstName} ${lastName}`.trim() || owner.email,
+        initials,
+        email: owner.email,
+        phone: owner.phone || 'Not provided',
+        submittedDate: formatDate(owner.createdAt),
+        properties: [],
+        idVerified: true, // Assume verified if they have properties
+      })
+    }
+
+    ownerMap.get(ownerId).properties.push(property)
+  })
+
+  // Convert to array and determine status based on properties
+  return Array.from(ownerMap.values()).map(app => {
+    const pendingProps = app.properties.filter((p: Property) => p.status === 'pending')
+    const activeProps = app.properties.filter((p: Property) => p.status === 'active')
+    const inactiveProps = app.properties.filter((p: Property) => p.status === 'inactive' || p.status === 'suspended')
+
+    // Determine overall application status
+    let status = 'approved'
+    if (pendingProps.length > 0) {
+      status = 'pending'
+    } else if (activeProps.length === 0 && inactiveProps.length > 0) {
+      status = 'rejected'
+    }
+
+    return {
+      ...app,
+      status,
+      propertyCount: app.properties.length,
+      description: `Provider with ${app.properties.length} ${app.properties.length === 1 ? 'property' : 'properties'} on the platform.`
+    }
+  })
+})
+
+const tabs = computed(() => {
+  const pending = applications.value.filter(a => a.status === 'pending').length
+  const approved = applications.value.filter(a => a.status === 'approved').length
+  const rejected = applications.value.filter(a => a.status === 'rejected').length
+
+  return [
+    { label: 'Pending', value: 'pending', count: pending },
+    { label: 'Approved', value: 'approved', count: approved },
+    { label: 'Rejected', value: 'rejected', count: rejected }
+  ]
+})
 
 const filteredApplications = computed(() => {
-  return applications.filter(app => app.status === activeTab.value)
+  return applications.value.filter(app => app.status === activeTab.value)
 })
+
+function formatDate(dateString: string): string {
+  const date = new Date(dateString)
+  return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+}
+
+async function approveProvider(applicationId: string) {
+  const app = applications.value.find(a => a.id === applicationId)
+  if (!app) return
+
+  try {
+    // Approve all pending properties for this provider
+    for (const property of app.properties) {
+      if (property.status === 'pending') {
+        await payload.update('properties', property.id, { status: 'active' })
+      }
+    }
+    await fetchProperties()
+    selectedApplication.value = null
+    toast.success('Provider approved successfully')
+  } catch (error) {
+    console.error('Failed to approve provider:', error)
+    toast.error('Failed to approve provider')
+  }
+}
+
+async function rejectProvider(applicationId: string) {
+  const confirmed = await confirm({
+    title: 'Reject Provider',
+    message: 'Are you sure you want to reject this provider application?',
+    confirmText: 'Reject',
+    variant: 'destructive',
+  })
+  if (!confirmed) return
+
+  const app = applications.value.find(a => a.id === applicationId)
+  if (!app) return
+
+  try {
+    // Reject all pending properties for this provider
+    for (const property of app.properties) {
+      if (property.status === 'pending') {
+        await payload.update('properties', property.id, { status: 'inactive' })
+      }
+    }
+    await fetchProperties()
+    selectedApplication.value = null
+    toast.success('Provider application rejected')
+  } catch (error) {
+    console.error('Failed to reject provider:', error)
+    toast.error('Failed to reject provider')
+  }
+}
 </script>

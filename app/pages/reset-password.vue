@@ -7,6 +7,8 @@ definePageMeta({
   layout: 'auth',
 })
 
+const { toast } = useToast()
+
 const password = ref('')
 const confirmPassword = ref('')
 const isSuccess = ref(false)
@@ -17,7 +19,7 @@ const handleReset = () => {
     console.log('Password updated successfully')
     isSuccess.value = true
   } else {
-    alert('Passwords do not match')
+    toast.error('Passwords do not match')
   }
 }
 </script>

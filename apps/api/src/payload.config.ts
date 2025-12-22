@@ -40,6 +40,8 @@ export default buildConfig({
     pool: {
       connectionString: process.env.DATABASE_URL || 'postgres://postgres:postgres@localhost:5432/watercloset',
     },
+    // Force schema push in production for initial deployment
+    push: process.env.PAYLOAD_FORCE_DRIZZLE_PUSH === 'true' || process.env.NODE_ENV !== 'production',
   }),
 
   collections: [

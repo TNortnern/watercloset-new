@@ -164,10 +164,10 @@ const getRandomElements = <T>(arr: readonly T[], count: number): T[] => {
 }
 
 // Helper to add small random offset to coordinates
-const offsetCoords = (lat: number, lng: number): [number, number] => {
+const offsetCoords = (lat: number, lng: number): { latitude: number; longitude: number } => {
   const latOffset = (Math.random() - 0.5) * 0.02 // ~1km offset
   const lngOffset = (Math.random() - 0.5) * 0.02
-  return [lng + lngOffset, lat + latOffset] // [lng, lat] for GeoJSON point
+  return { latitude: lat + latOffset, longitude: lng + lngOffset }
 }
 
 // Generate description for rich text
@@ -441,7 +441,8 @@ const seed = async () => {
               state: template.state,
               zipCode: String(Math.floor(Math.random() * 90000) + 10000),
               country: 'US',
-              coordinates: coords,
+              latitude: coords.latitude,
+              longitude: coords.longitude,
             },
             pricePerMinute,
             minimumDuration: 15,

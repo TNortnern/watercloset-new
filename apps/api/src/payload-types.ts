@@ -243,11 +243,8 @@ export interface Property {
     state: string;
     zipCode: string;
     country?: string | null;
-    /**
-     * @minItems 2
-     * @maxItems 2
-     */
-    coordinates: [number, number];
+    latitude: number;
+    longitude: number;
   };
   /**
    * Price in cents per minute
@@ -559,7 +556,8 @@ export interface PropertiesSelect<T extends boolean = true> {
         state?: T;
         zipCode?: T;
         country?: T;
-        coordinates?: T;
+        latitude?: T;
+        longitude?: T;
       };
   pricePerMinute?: T;
   minimumDuration?: T;

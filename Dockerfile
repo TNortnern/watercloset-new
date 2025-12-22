@@ -6,9 +6,10 @@ RUN corepack enable pnpm
 # ==================== PAYLOAD BUILD ====================
 FROM base AS payload-builder
 WORKDIR /payload
-# Copy workspace config for pnpm
-COPY pnpm-workspace.yaml ./
-COPY apps/api/package.json apps/api/pnpm-lock.yaml ./
+# Copy the entire API directory with its package.json
+COPY apps/api/package.json ./
+# Copy root lock file for workspace dependencies
+COPY pnpm-lock.yaml pnpm-workspace.yaml ./
 RUN pnpm install
 COPY apps/api/ ./
 RUN pnpm build
@@ -22,7 +23,8 @@ COPY server/ ./server/
 COPY public/ ./public/
 # Copy all config files needed for nuxt build
 COPY nuxt.config.ts tsconfig.json ./
-COPY tailwind.config.ts postcss.config.mjs ./
+COPY tailwind.config.js ./
+COPY components.json ./
 RUN pnpm install
 # Set proxy target for production - Payload runs on localhost:3000 in same container
 ENV PAYLOAD_PUBLIC_SERVER_URL=http://localhost:3000
@@ -38,7 +40,6 @@ RUN npm install -g pm2
 # Copy Payload standalone build
 COPY --from=payload-builder /payload/.next/standalone ./payload
 COPY --from=payload-builder /payload/.next/static ./payload/.next/static
-COPY --from=payload-builder /payload/public ./payload/public 2>/dev/null || true
 
 # Copy Nuxt build
 COPY --from=nuxt-builder /nuxt/.output ./nuxt/.output

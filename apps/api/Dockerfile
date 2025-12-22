@@ -6,8 +6,7 @@ RUN corepack enable
 COPY .npmrc package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY apps/api/package.json apps/api/package.json
 
-RUN --mount=type=cache,id=pnpm-store,target=/root/.pnpm-store \
-    pnpm install --frozen-lockfile --filter @watercloset/api...
+RUN pnpm install --frozen-lockfile --filter @watercloset/api...
 
 COPY apps/api ./apps/api
 

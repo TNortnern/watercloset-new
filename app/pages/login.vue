@@ -2,6 +2,7 @@
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { User, Briefcase, Shield } from 'lucide-vue-next'
 
 definePageMeta({
   layout: 'auth',
@@ -15,6 +16,36 @@ const email = ref('')
 const password = ref('')
 const error = ref('')
 const loading = ref(false)
+
+// Quick login test accounts
+const testAccounts = [
+  {
+    label: 'Enjoyer',
+    email: 'enjoyer@enjoyer.enjoyer',
+    password: 'enjoyer123',
+    icon: User,
+    color: 'bg-blue-500 hover:bg-blue-600'
+  },
+  {
+    label: 'Provider',
+    email: 'provider@provider.provider',
+    password: 'provider123',
+    icon: Briefcase,
+    color: 'bg-green-500 hover:bg-green-600'
+  },
+  {
+    label: 'Admin',
+    email: 'foodeater563@gmail.com',
+    password: 'Test1234!',
+    icon: Shield,
+    color: 'bg-purple-500 hover:bg-purple-600'
+  },
+]
+
+const fillTestAccount = (account: typeof testAccounts[0]) => {
+  email.value = account.email
+  password.value = account.password
+}
 
 // Get redirect URL from query params
 const redirectUrl = computed(() => {
@@ -49,7 +80,24 @@ const handleLogin = async () => {
 <template>
   <div>
     <h1 class="text-2xl font-bold text-slate-900 mb-2 text-center">Welcome Back</h1>
-    <p class="text-slate-600 text-center mb-8">Sign in to your account to continue</p>
+    <p class="text-slate-600 text-center mb-6">Sign in to your account to continue</p>
+
+    <!-- Quick Login Buttons -->
+    <div class="mb-6">
+      <p class="text-xs text-slate-500 text-center mb-3">Quick Login (Dev Only)</p>
+      <div class="flex gap-2">
+        <button
+          v-for="account in testAccounts"
+          :key="account.email"
+          type="button"
+          @click="fillTestAccount(account)"
+          :class="[account.color, 'flex-1 flex items-center justify-center gap-2 text-white text-sm font-medium py-2 px-3 rounded-lg transition-colors']"
+        >
+          <component :is="account.icon" class="w-4 h-4" />
+          {{ account.label }}
+        </button>
+      </div>
+    </div>
 
     <form @submit.prevent="handleLogin" class="space-y-6">
       <div v-if="error" class="bg-red-50 text-red-600 text-sm p-3 rounded-lg">

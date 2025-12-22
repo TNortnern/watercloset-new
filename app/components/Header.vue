@@ -4,10 +4,10 @@ import { Button } from '@/components/ui/button'
 const { user, isAuthenticated, isProvider, isAdmin, logout, userInitials, displayName } = useAuth()
 
 const links = [
+  { label: 'Find Bathrooms', to: '/search' },
+  { label: 'Become a Provider', to: '/become-provider' },
   { label: 'About', to: '/about' },
-  { label: 'Services', to: '/services' },
   { label: 'Safety', to: '/safety' },
-  { label: 'Contact', to: '/contact' }
 ]
 
 const showUserMenu = ref(false)

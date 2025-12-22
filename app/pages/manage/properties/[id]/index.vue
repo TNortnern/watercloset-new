@@ -28,6 +28,7 @@ const auth = useAuth()
 const payload = usePayload()
 const { toast } = useToast()
 const { confirm } = useConfirm()
+const { getAmenityLabel, getTypeLabel } = usePropertyUtils()
 const propertyId = route.params.id as string
 
 const isEditing = ref(false)
@@ -44,7 +45,7 @@ interface UploadedFile {
 interface Property {
   id: string
   name: string
-  description: string
+  description: any // richText field (Lexical JSON)
   type: string
   location: {
     address: string
@@ -63,6 +64,46 @@ interface Property {
   }
   photos?: { id: string, image: { id: string, url: string } }[]
   amenities: string[]
+}
+
+// Helper to extract plain text from richText (Lexical JSON)
+const extractTextFromRichText = (richText: any): string => {
+  if (!richText) return ''
+  if (typeof richText === 'string') return richText
+
+  // Handle Lexical format
+  if (richText.root?.children) {
+    const extractText = (nodes: any[]): string => {
+      return nodes.map(node => {
+        if (node.type === 'text') return node.text || ''
+        if (node.children) return extractText(node.children)
+        return ''
+      }).join('')
+    }
+    return extractText(richText.root.children)
+  }
+
+  return ''
+}
+
+// Helper to create richText structure from plain text
+const createRichTextFromString = (text: string): any => {
+  return {
+    root: {
+      type: 'root',
+      children: [
+        {
+          type: 'paragraph',
+          version: 1,
+          children: [{ type: 'text', text, version: 1 }],
+        },
+      ],
+      direction: 'ltr',
+      format: '',
+      indent: 0,
+      version: 1,
+    },
+  }
 }
 
 interface Booking {
@@ -114,6 +155,9 @@ const property = ref<Property>({
   pricePerMinute: propertyData.value!.pricePerMinute / 100
 })
 
+// Plain text description for editing
+const descriptionText = ref(extractTextFromRichText(propertyData.value?.description))
+
 const photoUploads = ref<UploadedFile[]>([])
 
 const mapPropertyPhotos = (photos?: Property['photos']) => {
@@ -146,6 +190,7 @@ watch(
       ...value,
       pricePerMinute: value.pricePerMinute / 100
     }
+    descriptionText.value = extractTextFromRichText(value.description)
   },
   { immediate: true }
 )
@@ -254,7 +299,7 @@ const saveChanges = async () => {
 
     await payload.update('properties', propertyId, {
       name: property.value.name,
-      description: property.value.description,
+      description: createRichTextFromString(descriptionText.value),
       pricePerMinute: Math.round(property.value.pricePerMinute * 100),
       minimumDuration: property.value.minimumDuration,
       maximumDuration: property.value.maximumDuration,
@@ -462,16 +507,16 @@ const renderStars = (rating: number) => {
             <div v-if="!isEditing" class="space-y-4">
               <div>
                 <label class="text-sm font-medium text-gray-600">Description</label>
-                <p class="mt-1 text-gray-900">{{ property.description }}</p>
+                <p class="mt-1 text-gray-900">{{ extractTextFromRichText(property.description) }}</p>
               </div>
               <div class="grid grid-cols-2 gap-4">
                 <div>
                   <label class="text-sm font-medium text-gray-600">Type</label>
-                  <p class="mt-1 text-gray-900 capitalize">{{ property.type }}</p>
+                  <p class="mt-1 text-gray-900">{{ getTypeLabel(property.type) }}</p>
                 </div>
                 <div>
                   <label class="text-sm font-medium text-gray-600">Price per Minute</label>
-                  <p class="mt-1 text-gray-900">${{ (property.pricePerMinute / 100).toFixed(2) }}</p>
+                  <p class="mt-1 text-gray-900">${{ property.pricePerMinute.toFixed(2) }}</p>
                 </div>
                 <div>
                   <label class="text-sm font-medium text-gray-600">Minimum Duration</label>
@@ -495,7 +540,7 @@ const renderStars = (rating: number) => {
               <div>
                 <label class="block text-sm font-medium text-gray-700 mb-2">Description</label>
                 <textarea
-                  v-model="property.description"
+                  v-model="descriptionText"
                   rows="4"
                   class="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 />
@@ -530,7 +575,7 @@ const renderStars = (rating: number) => {
                 :key="amenity"
                 class="px-3 py-1.5 bg-blue-100 text-blue-700 text-sm rounded-lg"
               >
-                {{ amenity }}
+                {{ getAmenityLabel(amenity) }}
               </span>
             </div>
           </div>

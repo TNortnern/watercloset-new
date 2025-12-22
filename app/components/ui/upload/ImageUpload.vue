@@ -159,7 +159,8 @@ const handleFiles = async (fileList: File[]) => {
 const uploadFile = async (file: File): Promise<UploadedFile | null> => {
   const formData = new FormData()
   formData.append('file', file)
-  formData.append('alt', file.name)
+  // Payload 3 requires additional fields to be sent as JSON in _payload field
+  formData.append('_payload', JSON.stringify({ alt: file.name }))
 
   try {
     const response = await $fetch<any>('/api/media', {

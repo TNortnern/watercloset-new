@@ -129,6 +129,11 @@ const duration = ref(15)
 const showAllPhotos = ref(false)
 const currentPhotoIndex = ref(0)
 
+// Contact host state
+const showContactModal = ref(false)
+const contactMessage = ref('')
+const isSendingMessage = ref(false)
+
 // Favorites state
 const isFavorited = computed(() => {
   if (!user.value?.favorites) return false
@@ -518,6 +523,44 @@ const formatReviewerName = (review: Review) => {
     return `${review.user.firstName || ''} ${review.user.lastName || ''}`.trim() || 'Guest'
   }
   return 'Guest'
+}
+
+// Contact host
+const openContactModal = () => {
+  if (!isAuthenticated.value) {
+    navigateTo('/login?redirect=' + encodeURIComponent(route.fullPath))
+    return
+  }
+  showContactModal.value = true
+}
+
+const sendMessage = async () => {
+  if (!contactMessage.value.trim()) {
+    toast.warning('Please enter a message')
+    return
+  }
+
+  if (!ownerInfo.value?.email) {
+    toast.error('Host contact information not available')
+    return
+  }
+
+  isSendingMessage.value = true
+  try {
+    // For now, open mailto link with pre-filled subject and body
+    const subject = encodeURIComponent(`Inquiry about "${property.value?.name}" on MyWaterCloset`)
+    const body = encodeURIComponent(`Hi ${ownerDisplayName.value},\n\n${contactMessage.value}\n\n---\nSent via MyWaterCloset\nProperty: ${property.value?.name}\nLink: ${window.location.href}`)
+    window.location.href = `mailto:${ownerInfo.value.email}?subject=${subject}&body=${body}`
+
+    toast.success('Opening your email client...')
+    showContactModal.value = false
+    contactMessage.value = ''
+  } catch (error) {
+    console.error('Failed to send message:', error)
+    toast.error('Failed to send message. Please try again.')
+  } finally {
+    isSendingMessage.value = false
+  }
 }
 
 watch(propertyId, () => {
@@ -975,7 +1018,7 @@ watch(propertyId, () => {
                     </div>
                   </div>
 
-                  <Button variant="outline" class="w-full mt-4">
+                  <Button variant="outline" class="w-full mt-4" @click="openContactModal">
                     <Mail class="w-4 h-4 mr-2" />
                     Contact Host
                   </Button>
@@ -985,6 +1028,51 @@ watch(propertyId, () => {
           </div>
         </div>
       </div>
+
+      <!-- Contact Host Modal -->
+      <Teleport to="body">
+        <div
+          v-if="showContactModal"
+          class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50"
+          @click.self="showContactModal = false"
+        >
+          <Card class="w-full max-w-md">
+            <CardHeader>
+              <CardTitle>Contact {{ ownerDisplayName }}</CardTitle>
+              <CardDescription>Send a message about "{{ property?.name }}"</CardDescription>
+            </CardHeader>
+            <CardContent class="space-y-4">
+              <div class="space-y-2">
+                <Label for="contact-message">Your Message</Label>
+                <textarea
+                  id="contact-message"
+                  v-model="contactMessage"
+                  rows="5"
+                  class="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary resize-none"
+                  placeholder="Hi! I'm interested in booking your bathroom. I have a question about..."
+                  :disabled="isSendingMessage"
+                />
+              </div>
+              <div class="flex gap-3">
+                <Button
+                  class="flex-1"
+                  @click="sendMessage"
+                  :disabled="isSendingMessage || !contactMessage.trim()"
+                >
+                  <Mail class="w-4 h-4 mr-2" />
+                  {{ isSendingMessage ? 'Opening Email...' : 'Send Message' }}
+                </Button>
+                <Button variant="outline" @click="showContactModal = false" :disabled="isSendingMessage">
+                  Cancel
+                </Button>
+              </div>
+              <p class="text-xs text-slate-500 text-center">
+                This will open your email client to send the message
+              </p>
+            </CardContent>
+          </Card>
+        </div>
+      </Teleport>
     </div>
   </div>
 </template>

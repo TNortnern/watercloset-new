@@ -1,5 +1,34 @@
 <template>
   <div class="space-y-6">
+    <!-- Avatar Upload Modal -->
+    <Teleport to="body">
+      <div
+        v-if="showAvatarUpload"
+        class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50"
+        @click.self="showAvatarUpload = false"
+      >
+        <Card class="w-full max-w-md">
+          <CardHeader>
+            <CardTitle>Update Profile Photo</CardTitle>
+          </CardHeader>
+          <CardContent class="space-y-4">
+            <ImageUpload
+              v-model="avatarFile"
+              :multiple="false"
+              placeholder="Upload a new profile photo"
+              :max-size-mb="5"
+              @update:model-value="handleAvatarChange"
+            />
+            <div class="flex justify-end">
+              <Button variant="outline" @click="showAvatarUpload = false">
+                Cancel
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    </Teleport>
+
     <!-- Header -->
     <div>
       <h1 class="text-3xl font-bold text-slate-900">Account Settings</h1>
@@ -38,10 +67,16 @@
             <CardContent class="p-6">
               <div class="flex items-start gap-6 mb-6">
                 <div class="flex-shrink-0">
-                  <div class="w-24 h-24 rounded-full bg-slate-200 flex items-center justify-center">
-                    <User class="w-12 h-12 text-slate-400" />
+                  <div class="w-24 h-24 rounded-full bg-slate-200 flex items-center justify-center overflow-hidden">
+                    <img
+                      v-if="avatarUrl"
+                      :src="avatarUrl"
+                      alt="Profile"
+                      class="w-full h-full object-cover"
+                    />
+                    <User v-else class="w-12 h-12 text-slate-400" />
                   </div>
-                  <Button variant="outline" size="sm" class="mt-3 w-24">
+                  <Button variant="outline" size="sm" class="mt-3 w-24" @click="openAvatarUpload">
                     Change
                   </Button>
                 </div>
@@ -113,8 +148,10 @@
                 <p class="text-xs text-slate-500 mt-1.5">{{ profile.bio.length }}/500 characters</p>
               </div>
               <div class="flex justify-end gap-3 mt-4">
-                <Button variant="outline">Cancel</Button>
-                <Button>Save Changes</Button>
+                <Button variant="outline" @click="cancelProfileChanges">Cancel</Button>
+                <Button @click="saveProfile" :disabled="isSaving">
+                  {{ isSaving ? 'Saving...' : 'Save Changes' }}
+                </Button>
               </div>
             </CardContent>
           </Card>
@@ -409,6 +446,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
+import { ImageUpload } from '@/components/ui/upload'
 
 definePageMeta({
   layout: 'dashboard-user',
@@ -421,6 +459,8 @@ const { confirm } = useConfirm()
 
 const activeTab = ref('profile')
 const isSaving = ref(false)
+const showAvatarUpload = ref(false)
+const avatarFile = ref<{ url: string; id?: string | number } | null>(null)
 
 // Profile data from current user
 const profile = ref({
@@ -629,4 +669,37 @@ const deleteAccount = async () => {
   // TODO: Implement account deletion
   toast.info('Account deletion feature coming soon')
 }
+
+// Avatar upload
+const openAvatarUpload = () => {
+  showAvatarUpload.value = true
+}
+
+const handleAvatarChange = async (file: { url: string; id?: string | number } | null) => {
+  if (!file || !user.value?.id) return
+
+  try {
+    await payload.update('users', user.value.id, {
+      avatar: file.id,
+    })
+
+    user.value = {
+      ...user.value,
+      avatar: { url: file.url, id: file.id },
+    }
+
+    showAvatarUpload.value = false
+    avatarFile.value = null
+    toast.success('Profile photo updated!')
+  } catch (error) {
+    console.error('Failed to update avatar:', error)
+    toast.error('Failed to update profile photo. Please try again.')
+  }
+}
+
+// Computed avatar URL
+const avatarUrl = computed(() => {
+  if (user.value?.avatar?.url) return user.value.avatar.url
+  return null
+})
 </script>

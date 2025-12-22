@@ -78,42 +78,63 @@ interface Review {
   rating: number
 }
 
-// Fetch provider's properties
-const { data: propertiesData } = await useAsyncData('provider-properties', async () => {
-  if (!auth.user.value?.id) return null
-  return await payload.find<Property>('properties', {
-    where: { owner: { equals: auth.user.value.id } },
-    depth: 1
-  })
-})
+// Fetch provider's properties - server: false ensures this runs on client where auth is available
+const { data: propertiesData } = await useAsyncData(
+  'dashboard-my-properties',
+  async () => {
+    if (!auth.user.value?.id) return null
+    return await payload.find<Property>('properties', {
+      where: { owner: { equals: auth.user.value.id } },
+      depth: 1
+    })
+  },
+  {
+    server: false,
+    watch: [() => auth.user.value?.id]
+  }
+)
 
 // Fetch all bookings for provider's properties
-const { data: bookingsData } = await useAsyncData('provider-bookings', async () => {
-  if (!auth.user.value?.id) return null
-  return await payload.find<Booking>('bookings', {
-    where: {
-      'property.owner': { equals: auth.user.value.id }
-    },
-    depth: 2,
-    limit: 100,
-    sort: '-createdAt'
-  })
-})
+const { data: bookingsData } = await useAsyncData(
+  'dashboard-my-bookings',
+  async () => {
+    if (!auth.user.value?.id) return null
+    return await payload.find<Booking>('bookings', {
+      where: {
+        'property.owner': { equals: auth.user.value.id }
+      },
+      depth: 2,
+      limit: 100,
+      sort: '-createdAt'
+    })
+  },
+  {
+    server: false,
+    watch: [() => auth.user.value?.id]
+  }
+)
 
 // Fetch reviews for provider's properties
-const { data: reviewsData } = await useAsyncData('provider-reviews', async () => {
-  if (!auth.user.value?.id) return null
-  const propertyIds = propertiesData.value?.docs.map(p => p.id) || []
-  if (propertyIds.length === 0) return null
+const { data: reviewsData } = await useAsyncData(
+  'dashboard-my-reviews',
+  async () => {
+    if (!auth.user.value?.id) return null
+    const propertyIds = propertiesData.value?.docs.map(p => p.id) || []
+    if (propertyIds.length === 0) return null
 
-  return await payload.find<Review>('reviews', {
-    where: {
-      property: { in: propertyIds }
-    },
-    depth: 1,
-    limit: 1000
-  })
-})
+    return await payload.find<Review>('reviews', {
+      where: {
+        property: { in: propertyIds }
+      },
+      depth: 1,
+      limit: 1000
+    })
+  },
+  {
+    server: false,
+    watch: [() => auth.user.value?.id, () => propertiesData.value]
+  }
+)
 
 const properties = computed(() => propertiesData.value?.docs || [])
 const allBookings = computed(() => bookingsData.value?.docs || [])

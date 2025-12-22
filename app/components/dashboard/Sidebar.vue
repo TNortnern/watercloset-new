@@ -303,10 +303,11 @@ const isMobile = ref(false)
 const userMenuOpen = ref(false)
 
 const isActive = (href: string) => {
-  // Exact match for dashboard home, prefix match for subpages
-  if (href === '/dashboard') {
-    return route.path === '/dashboard'
+  // Exact match for dashboard home routes
+  if (href === '/dashboard' || href === '/manage') {
+    return route.path === href
   }
+  // Prefix match for subpages
   return route.path === href || route.path.startsWith(href + '/')
 }
 

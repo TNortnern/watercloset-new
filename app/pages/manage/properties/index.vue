@@ -22,6 +22,7 @@ const auth = useAuth()
 const payload = usePayload()
 const { toast } = useToast()
 const { confirm } = useConfirm()
+const { getAmenityLabel } = usePropertyUtils()
 
 interface Property {
   id: string
@@ -53,41 +54,103 @@ interface Review {
 const searchQuery = ref('')
 const selectedStatus = ref('all')
 
-// Fetch provider's properties
-const { data: propertiesData, refresh: refreshProperties } = await useAsyncData('properties-list', async () => {
-  if (!auth.user.value?.id) return null
-  return await payload.find<Property>('properties', {
-    where: { owner: { equals: auth.user.value.id } },
-    depth: 1,
-    limit: 100
-  })
+// Use reactive refs for data - no caching to ensure fresh data
+const propertiesData = ref<{ docs: Property[], totalDocs: number }>({ docs: [], totalDocs: 0 })
+const bookingsData = ref<{ docs: Booking[], totalDocs: number }>({ docs: [], totalDocs: 0 })
+const reviewsData = ref<{ docs: Review[], totalDocs: number }>({ docs: [], totalDocs: 0 })
+const propertiesPending = ref(true)
+
+// Fetch functions
+const fetchProperties = async () => {
+  if (!auth.user.value?.id) {
+    propertiesData.value = { docs: [], totalDocs: 0 }
+    return
+  }
+
+  propertiesPending.value = true
+  try {
+    const result = await payload.find<Property>('properties', {
+      where: { owner: { equals: auth.user.value.id } },
+      depth: 1,
+      limit: 100
+    })
+    propertiesData.value = result
+  } catch (error) {
+    console.error('Failed to fetch properties:', error)
+    propertiesData.value = { docs: [], totalDocs: 0 }
+  } finally {
+    propertiesPending.value = false
+  }
+}
+
+const fetchBookings = async () => {
+  if (!auth.user.value?.id) {
+    bookingsData.value = { docs: [], totalDocs: 0 }
+    return
+  }
+
+  try {
+    const result = await payload.find<Booking>('bookings', {
+      where: {
+        'property.owner': { equals: auth.user.value.id }
+      },
+      depth: 1,
+      limit: 1000
+    })
+    bookingsData.value = result
+  } catch (error) {
+    console.error('Failed to fetch bookings:', error)
+  }
+}
+
+const fetchReviews = async () => {
+  if (!auth.user.value?.id) {
+    reviewsData.value = { docs: [], totalDocs: 0 }
+    return
+  }
+
+  const propertyIds = propertiesData.value?.docs?.map(p => p.id) || []
+  if (propertyIds.length === 0) {
+    reviewsData.value = { docs: [], totalDocs: 0 }
+    return
+  }
+
+  try {
+    const result = await payload.find<Review>('reviews', {
+      where: {
+        property: { in: propertyIds }
+      },
+      depth: 1,
+      limit: 1000
+    })
+    reviewsData.value = result
+  } catch (error) {
+    console.error('Failed to fetch reviews:', error)
+  }
+}
+
+const refreshProperties = async () => {
+  await fetchProperties()
+  await fetchReviews()
+}
+
+// Fetch data on mount and when user changes
+onMounted(async () => {
+  // Clear any cached Nuxt data
+  clearNuxtData('my-properties-list')
+  clearNuxtData('my-properties-bookings')
+  clearNuxtData('my-properties-reviews')
+
+  await fetchProperties()
+  await Promise.all([fetchBookings(), fetchReviews()])
 })
 
-// Fetch all bookings for count
-const { data: bookingsData } = await useAsyncData('properties-bookings', async () => {
-  if (!auth.user.value?.id) return null
-  return await payload.find<Booking>('bookings', {
-    where: {
-      'property.owner': { equals: auth.user.value.id }
-    },
-    depth: 1,
-    limit: 1000
-  })
-})
-
-// Fetch all reviews
-const { data: reviewsData } = await useAsyncData('properties-reviews', async () => {
-  if (!auth.user.value?.id) return null
-  const propertyIds = propertiesData.value?.docs.map(p => p.id) || []
-  if (propertyIds.length === 0) return null
-
-  return await payload.find<Review>('reviews', {
-    where: {
-      property: { in: propertyIds }
-    },
-    depth: 1,
-    limit: 1000
-  })
+// Watch for user changes
+watch(() => auth.user.value?.id, async (newId, oldId) => {
+  if (newId !== oldId) {
+    await fetchProperties()
+    await Promise.all([fetchBookings(), fetchReviews()])
+  }
 })
 
 const allProperties = computed(() => propertiesData.value?.docs || [])
@@ -301,7 +364,7 @@ const deleteProperty = async (propertyId: string) => {
               :key="amenity"
               class="px-2 py-1 bg-gray-100 text-gray-700 text-xs rounded-md"
             >
-              {{ amenity }}
+              {{ getAmenityLabel(amenity) }}
             </span>
           </div>
 

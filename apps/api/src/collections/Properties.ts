@@ -172,7 +172,17 @@ export const Properties: CollectionConfig = {
         { label: 'Suspended', value: 'suspended' },
       ],
       access: {
-        update: ({ req: { user } }) => user?.role === 'admin',
+        // Admins can set any status, providers can only toggle active/inactive
+        update: ({ req: { user }, data, siblingData }) => {
+          if (!user) return false
+          if (user.role === 'admin') return true
+          // Providers can only switch between active and inactive
+          if (user.role === 'provider') {
+            const newStatus = data?.status || siblingData?.status
+            return newStatus === 'active' || newStatus === 'inactive'
+          }
+          return false
+        },
       },
     },
     {

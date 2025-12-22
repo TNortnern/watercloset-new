@@ -479,9 +479,161 @@ const seed = async () => {
     }
   }
 
-  console.log(`\n\nSeeding complete!`)
+  console.log(`\n\nProperty seeding complete!`)
   console.log(`Created: ${createdCount} properties`)
   console.log(`Skipped: ${skippedCount} (already existed)`)
+
+  // Seed bookings and reviews
+  console.log('\nSeeding bookings and reviews...')
+
+  // Get all properties and the enjoyer user
+  const allProperties = await payload.find({
+    collection: 'properties',
+    limit: 200,
+  })
+
+  const enjoyer = await payload.find({
+    collection: 'users',
+    where: { email: { equals: 'enjoyer@enjoyer.enjoyer' } },
+  })
+
+  if (enjoyer.docs.length === 0) {
+    console.log('Enjoyer user not found, skipping reviews seeding')
+    process.exit(0)
+  }
+
+  const enjoyerId = enjoyer.docs[0].id
+  const reviewComments = [
+    'Great bathroom! Very clean and well-maintained.',
+    'Exactly as described. Would use again.',
+    'Clean, convenient, and the host was very responsive.',
+    'Perfect for a quick stop. Highly recommend!',
+    'Nice amenities and easy access. 5 stars!',
+    'Good location but could be cleaner.',
+    'Decent bathroom for the price. Nothing special.',
+    'Better than expected! Will definitely return.',
+    'Clean and private. Great experience.',
+    'The host was super helpful. Clean facility.',
+    'Convenient location. Clean enough.',
+    'Pretty good overall. Met my needs.',
+    'Nice and spacious. Very clean.',
+    'Quick and easy booking process. Clean bathroom.',
+    'Solid choice for the area. Recommended.',
+  ]
+
+  let bookingsCreated = 0
+  let reviewsCreated = 0
+
+  // Create 3-5 bookings with reviews per property (up to 50 properties)
+  const propertiesToSeed = allProperties.docs.slice(0, 50)
+
+  for (const property of propertiesToSeed) {
+    const numReviews = Math.floor(Math.random() * 3) + 3 // 3-5 reviews per property
+
+    for (let i = 0; i < numReviews; i++) {
+      try {
+        // Create a completed booking
+        const daysAgo = Math.floor(Math.random() * 60) + 1
+        const startTime = new Date()
+        startTime.setDate(startTime.getDate() - daysAgo)
+        startTime.setHours(10 + Math.floor(Math.random() * 8), 0, 0, 0)
+
+        const endTime = new Date(startTime)
+        endTime.setMinutes(endTime.getMinutes() + 15 + Math.floor(Math.random() * 30)) // 15-45 minutes
+
+        const durationMinutes = Math.ceil((endTime.getTime() - startTime.getTime()) / 60000)
+        const totalAmount = property.pricePerMinute * durationMinutes
+        const platformFee = Math.round(totalAmount * 0.15)
+        const providerPayout = totalAmount - platformFee
+
+        // Check if booking already exists for this property/time
+        const existingBooking = await payload.find({
+          collection: 'bookings',
+          where: {
+            property: { equals: property.id },
+            startTime: { equals: startTime.toISOString() },
+          },
+        })
+
+        if (existingBooking.docs.length > 0) {
+          continue // Skip if booking exists
+        }
+
+        // Create booking directly (bypassing hooks that require Stripe)
+        const booking = await payload.create({
+          collection: 'bookings',
+          data: {
+            user: enjoyerId,
+            property: property.id,
+            startTime: startTime.toISOString(),
+            endTime: endTime.toISOString(),
+            duration: durationMinutes,
+            status: 'completed',
+            totalAmount,
+            platformFee,
+            providerPayout,
+            hasBeenReviewed: true,
+          },
+          overrideAccess: true,
+        })
+        bookingsCreated++
+
+        // Create review for this booking
+        const rating = Math.floor(Math.random() * 2) + 3.5 // 3.5-5
+        const comment = reviewComments[Math.floor(Math.random() * reviewComments.length)]
+
+        await payload.create({
+          collection: 'reviews',
+          data: {
+            booking: booking.id,
+            property: property.id,
+            user: enjoyerId,
+            rating: Math.round(rating),
+            cleanliness: Math.floor(Math.random() * 2) + 4,
+            accuracy: Math.floor(Math.random() * 2) + 4,
+            communication: Math.floor(Math.random() * 2) + 4,
+            comment,
+          },
+          overrideAccess: true,
+        })
+        reviewsCreated++
+
+        process.stdout.write(`\rCreated ${bookingsCreated} bookings, ${reviewsCreated} reviews...`)
+      } catch (error) {
+        // Silently skip errors (e.g., duplicate reviews)
+      }
+    }
+  }
+
+  // Update property stats based on actual reviews
+  console.log('\n\nUpdating property stats...')
+  for (const property of propertiesToSeed) {
+    const reviews = await payload.find({
+      collection: 'reviews',
+      where: { property: { equals: property.id } },
+      limit: 100,
+    })
+
+    if (reviews.docs.length > 0) {
+      const totalRating = reviews.docs.reduce((sum, r) => sum + r.rating, 0)
+      const averageRating = Math.round((totalRating / reviews.docs.length) * 10) / 10
+
+      await payload.update({
+        collection: 'properties',
+        id: property.id,
+        data: {
+          stats: {
+            ...property.stats,
+            averageRating,
+            reviewCount: reviews.docs.length,
+          },
+        },
+      })
+    }
+  }
+
+  console.log(`\nSeeding complete!`)
+  console.log(`Created: ${bookingsCreated} bookings, ${reviewsCreated} reviews`)
   process.exit(0)
 }
 

@@ -142,6 +142,26 @@ const toggleDay = (day: string) => {
   }
 }
 
+// Helper to create richText structure from plain text
+const createRichTextFromString = (text: string): any => {
+  return {
+    root: {
+      type: 'root',
+      children: [
+        {
+          type: 'paragraph',
+          version: 1,
+          children: [{ type: 'text', text, version: 1 }],
+        },
+      ],
+      direction: 'ltr',
+      format: '',
+      indent: 0,
+      version: 1,
+    },
+  }
+}
+
 const submitForm = async () => {
   if (isSubmitting.value) return
   isSubmitting.value = true
@@ -183,10 +203,10 @@ const submitForm = async () => {
 
     const coordinates: [number, number] = [bestMatch.lng, bestMatch.lat]
 
-    // Create property object
+    // Create property object (owner is set by beforeChange hook, status uses default 'pending')
     const propertyData = {
       name: formData.value.name,
-      description: formData.value.description,
+      description: createRichTextFromString(formData.value.description),
       type: formData.value.type,
       location: {
         address: formData.value.street,
@@ -211,8 +231,6 @@ const submitForm = async () => {
           endTime: '22:00'
         }))
       },
-      owner: auth.user.value!.id,
-      status: 'pending'
     }
 
     const newProperty = await payload.create('properties', propertyData)

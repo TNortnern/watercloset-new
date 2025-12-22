@@ -4,8 +4,8 @@
 export default defineEventHandler(async (event) => {
   const query = getQuery<{ text?: string, latitude?: string, longitude?: string, q?: string }>(event)
 
-  // Use environment variable for API key
-  const apiKey = process.env.GOOGLE_MAPS_API_KEY || ''
+  // Use environment variable for API key (support both naming conventions)
+  const apiKey = process.env.GOOGLE_MAPS_API_KEY || process.env.NUXT_PUBLIC_GOOGLE_MAPS_API_KEY || ''
 
   if (!apiKey) {
     throw createError({

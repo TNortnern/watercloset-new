@@ -10,7 +10,8 @@ export default defineNuxtRouteMiddleware(async (to, from) => {
     return navigateTo('/login')
   }
 
-  if (!auth.isProvider.value) {
+  // Allow both providers and admins to access provider pages
+  if (!auth.isProvider.value && !auth.isAdmin.value) {
     return navigateTo('/')
   }
 })

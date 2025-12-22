@@ -507,17 +507,23 @@ const uploadAvatar = () => {
 const handleAvatarChange = async (file: { url: string; id?: string | number } | null) => {
   if (!file || !user.value?.id) return
 
+  if (!file.id) {
+    toast.error('Failed to upload image. Please try again.')
+    return
+  }
+
   try {
     await payload.update('users', user.value.id, {
-      avatar: file.id || file.url,
+      avatar: file.id,
     })
 
     user.value = {
       ...user.value,
-      avatar: { url: file.url },
+      avatar: { url: file.url, id: file.id },
     }
 
     showAvatarUpload.value = false
+    avatarFile.value = null
     toast.success('Avatar updated successfully!')
   } catch (error) {
     console.error('Failed to update avatar:', error)

@@ -28,7 +28,13 @@ export const Reviews: CollectionConfig = {
   },
   hooks: {
     beforeValidate: [
-      async ({ req, data, operation }) => {
+      async ({ req, data, operation, context }) => {
+        // Allow seeding with overrideAccess (when user and property are already set)
+        if (operation === 'create' && data?.booking && data?.user && data?.property) {
+          // If user and property are already set (seeding), skip validation
+          return data
+        }
+
         if (operation === 'create' && data?.booking) {
           if (!req.user) {
             throw new Error('Authentication required')

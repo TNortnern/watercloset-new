@@ -65,6 +65,55 @@ const sidebarCollapsed = ref(false)
 
 // Get real user from auth
 const { user: authUser, userInitials, displayName, logout } = useAuth()
+const payload = usePayload()
+
+// Fetch real counts for badges
+const { data: counts } = await useAsyncData('dashboard-counts', async () => {
+  if (!authUser.value?.id) return { properties: 0, bookings: 0, reviews: 0 }
+
+  try {
+    // Fetch properties count
+    const propertiesRes = await payload.find('properties', {
+      where: { owner: { equals: authUser.value.id } },
+      limit: 0, // Just get count
+    })
+
+    // Fetch pending/upcoming bookings count
+    const bookingsRes = await payload.find('bookings', {
+      where: {
+        'property.owner': { equals: authUser.value.id },
+        status: { in: ['pending', 'confirmed'] },
+      },
+      limit: 0,
+    })
+
+    // Fetch unread reviews count (reviews from last 7 days)
+    const weekAgo = new Date()
+    weekAgo.setDate(weekAgo.getDate() - 7)
+    const propertyIds = propertiesRes.docs?.map((p: any) => p.id) || []
+
+    let reviewCount = 0
+    if (propertyIds.length > 0) {
+      const reviewsRes = await payload.find('reviews', {
+        where: {
+          property: { in: propertyIds },
+          createdAt: { greater_than: weekAgo.toISOString() },
+        },
+        limit: 0,
+      })
+      reviewCount = reviewsRes.totalDocs || 0
+    }
+
+    return {
+      properties: propertiesRes.totalDocs || 0,
+      bookings: bookingsRes.totalDocs || 0,
+      reviews: reviewCount,
+    }
+  } catch (error) {
+    console.error('Failed to fetch dashboard counts:', error)
+    return { properties: 0, bookings: 0, reviews: 0 }
+  }
+}, { watch: [() => authUser.value?.id] })
 
 // Format user for Header/Sidebar components
 const user = computed(() => ({
@@ -75,19 +124,19 @@ const user = computed(() => ({
   avatar: authUser.value?.avatar?.url
 }))
 
-// Provider dashboard navigation
-const navigationItems = [
+// Provider dashboard navigation with real counts
+const navigationItems = computed(() => [
   { name: 'Dashboard', href: '/manage', icon: LayoutDashboard },
-  { name: 'My Properties', href: '/manage/properties', icon: Building2, badge: 8 },
-  { name: 'Bookings', href: '/manage/bookings', icon: Calendar, badge: 5 },
+  { name: 'My Properties', href: '/manage/properties', icon: Building2, badge: counts.value?.properties || undefined },
+  { name: 'Bookings', href: '/manage/bookings', icon: Calendar, badge: counts.value?.bookings || undefined },
   { name: 'Earnings', href: '/manage/earnings', icon: DollarSign },
-  { name: 'Reviews', href: '/manage/reviews', icon: Star, badge: 3 },
+  { name: 'Reviews', href: '/manage/reviews', icon: Star, badge: counts.value?.reviews || undefined },
   { name: 'Settings', href: '/manage/settings', icon: Settings },
-]
+])
 
 // Mobile navigation shows only main items
 const mobileNavigationItems = computed(() => {
-  return navigationItems.filter(item =>
+  return navigationItems.value.filter(item =>
     ['Dashboard', 'My Properties', 'Bookings', 'Earnings'].includes(item.name)
   )
 })

@@ -28,34 +28,66 @@ export const usePayload = () => {
   const config = useRuntimeConfig()
 
   /**
+   * Convert a where object to Payload v3 URL query string format
+   * e.g., { owner: { equals: 1 } } becomes where[owner][equals]=1
+   */
+  const buildWhereParams = (where: Record<string, any>, prefix = 'where'): string => {
+    const parts: string[] = []
+
+    for (const [key, value] of Object.entries(where)) {
+      const fullKey = `${prefix}[${key}]`
+
+      if (value !== null && typeof value === 'object' && !Array.isArray(value)) {
+        // Recursively handle nested objects
+        parts.push(buildWhereParams(value, fullKey))
+      } else if (Array.isArray(value)) {
+        // Handle arrays - encode each element
+        value.forEach((item, index) => {
+          if (typeof item === 'object' && item !== null) {
+            parts.push(buildWhereParams(item, `${fullKey}[${index}]`))
+          } else {
+            parts.push(`${encodeURIComponent(`${fullKey}[${index}]`)}=${encodeURIComponent(String(item))}`)
+          }
+        })
+      } else {
+        // Primitive value
+        parts.push(`${encodeURIComponent(fullKey)}=${encodeURIComponent(String(value))}`)
+      }
+    }
+
+    return parts.filter(Boolean).join('&')
+  }
+
+  /**
    * Find documents in a collection
    */
   const find = async <T>(
     collection: string,
     query?: PayloadQuery
   ): Promise<PayloadResponse<T>> => {
-    const params = new URLSearchParams()
+    const params: string[] = []
 
     if (query?.where) {
-      params.set('where', JSON.stringify(query.where))
+      // Use URL query string format for Payload v3 compatibility
+      params.push(buildWhereParams(query.where))
     }
     if (query?.limit) {
-      params.set('limit', String(query.limit))
+      params.push(`limit=${query.limit}`)
     }
     if (query?.page) {
-      params.set('page', String(query.page))
+      params.push(`page=${query.page}`)
     }
     if (query?.sort) {
-      params.set('sort', query.sort)
+      params.push(`sort=${encodeURIComponent(query.sort)}`)
     }
     if (query?.depth !== undefined) {
-      params.set('depth', String(query.depth))
+      params.push(`depth=${query.depth}`)
     }
 
-    const queryString = params.toString()
+    const queryString = params.filter(Boolean).join('&')
     const url = `/api/${collection}${queryString ? `?${queryString}` : ''}`
 
-    return await $fetch<PayloadResponse<T>>(url)
+    return await $fetch<PayloadResponse<T>>(url, { credentials: 'include' })
   }
 
   /**
@@ -67,7 +99,7 @@ export const usePayload = () => {
     depth?: number
   ): Promise<T> => {
     const params = depth !== undefined ? `?depth=${depth}` : ''
-    return await $fetch<T>(`/api/${collection}/${id}${params}`)
+    return await $fetch<T>(`/api/${collection}/${id}${params}`, { credentials: 'include' })
   }
 
   /**
@@ -77,10 +109,12 @@ export const usePayload = () => {
     collection: string,
     data: Partial<T>
   ): Promise<T> => {
-    return await $fetch<T>(`/api/${collection}`, {
+    const response = await $fetch<{ doc: T; message: string }>(`/api/${collection}`, {
       method: 'POST',
       body: data,
+      credentials: 'include',
     })
+    return response.doc
   }
 
   /**
@@ -91,11 +125,12 @@ export const usePayload = () => {
     id: string,
     data: Partial<T>
   ): Promise<T> => {
-    return await $fetch<T>(`/api/${collection}/${id}`, {
+    const response = await $fetch<{ doc: T; message: string }>(`/api/${collection}/${id}`, {
       method: 'PATCH',
       body: data,
       credentials: 'include',
     })
+    return response.doc
   }
 
   /**
@@ -104,6 +139,7 @@ export const usePayload = () => {
   const remove = async (collection: string, id: string): Promise<void> => {
     await $fetch(`/api/${collection}/${id}`, {
       method: 'DELETE',
+      credentials: 'include',
     })
   }
 
@@ -114,6 +150,7 @@ export const usePayload = () => {
     return await $fetch<{ user: any; token: string }>('/api/users/login', {
       method: 'POST',
       body: { email, password },
+      credentials: 'include',
     })
   }
 
@@ -123,6 +160,7 @@ export const usePayload = () => {
   const logout = async () => {
     return await $fetch('/api/users/logout', {
       method: 'POST',
+      credentials: 'include',
     })
   }
 
@@ -140,7 +178,10 @@ export const usePayload = () => {
         }
       }
 
-      return await $fetch<{ user: any }>('/api/users/me?depth=1', { headers })
+      return await $fetch<{ user: any }>('/api/users/me?depth=1', {
+        headers,
+        credentials: 'include',
+      })
     } catch {
       return null
     }
@@ -159,6 +200,7 @@ export const usePayload = () => {
     return await $fetch<{ user: any; token: string }>('/api/users', {
       method: 'POST',
       body: data,
+      credentials: 'include',
     })
   }
 

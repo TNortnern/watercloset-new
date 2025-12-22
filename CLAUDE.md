@@ -2,14 +2,16 @@
 
 ## Deployment
 
-### Railway
+### Railway (Monolithic)
 - **Project**: watercloset-new
 - **Workspace**: Trayvon Northern (hobby account)
 - **Project URL**: https://railway.com/project/93d228b9-6978-4024-88b5-241769930463
-- **Live Frontend**: https://watercloset-new-production.up.railway.app
+- **Live Site**: https://watercloset-new-production.up.railway.app
 
-**Note**: The Nuxt frontend and Payload API (apps/api) need separate deployments.
-The frontend proxies /api/* requests to the Payload API.
+**Architecture**: Single container running both Nuxt and Payload via PM2
+- Payload runs internally on port 3000
+- Nuxt is exposed on Railway's PORT (public)
+- Nuxt proxies /api/* to localhost:3000 (internal Payload)
 
 ### Tech Stack
 - **Frontend**: Nuxt 4 (app/)

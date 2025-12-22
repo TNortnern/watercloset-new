@@ -19,10 +19,8 @@ interface Property {
     city?: string
     state?: string
     zipCode?: string
-    coordinates?: {
-      type: string
-      coordinates: [number, number]
-    }
+    latitude?: number
+    longitude?: number
   }
   amenities?: string[]
   type?: string

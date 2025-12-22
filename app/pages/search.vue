@@ -27,7 +27,8 @@ interface Property {
     city?: string
     state?: string
     zipCode?: string
-    coordinates?: [number, number] // [lng, lat] from Payload point type
+    latitude?: number
+    longitude?: number
   }
   amenities?: string[]
   type?: string

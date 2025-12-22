@@ -58,10 +58,8 @@ export interface PropertyLocation {
   state: string
   zipCode: string
   country?: string
-  coordinates: {
-    type: 'Point'
-    coordinates: [number, number] // [longitude, latitude]
-  }
+  latitude: number
+  longitude: number
 }
 
 export interface PropertyPhoto {

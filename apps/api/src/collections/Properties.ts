@@ -1,6 +1,18 @@
 import type { CollectionConfig } from 'payload'
 import type { PayloadRequest } from 'payload'
-import { sql } from 'drizzle-orm'
+
+// Haversine formula to calculate distance between two points
+function calculateDistance(lat1: number, lon1: number, lat2: number, lon2: number): number {
+  const R = 6371000 // Earth's radius in meters
+  const dLat = (lat2 - lat1) * Math.PI / 180
+  const dLon = (lon2 - lon1) * Math.PI / 180
+  const a =
+    Math.sin(dLat/2) * Math.sin(dLat/2) +
+    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+    Math.sin(dLon/2) * Math.sin(dLon/2)
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a))
+  return R * c // Distance in meters
+}
 
 export const Properties: CollectionConfig = {
   slug: 'properties',
@@ -28,72 +40,33 @@ export const Properties: CollectionConfig = {
         }
 
         try {
-          // Use raw SQL for PostGIS distance calculation
-          const db = req.payload.db
-          const drizzle = (db as any).drizzle
+          // Fetch all active properties
+          const result = await req.payload.find({
+            collection: 'properties',
+            where: {
+              status: { equals: 'active' },
+            },
+            limit: 1000, // Get all, filter in JS
+            depth: 1,
+          })
 
-          if (!drizzle) {
-            // Fallback to standard find without distance
-            const result = await req.payload.find({
-              collection: 'properties',
-              where: {
-                status: { equals: 'active' },
-              },
-              limit,
-              depth: 1,
+          // Calculate distances and filter by radius
+          const docsWithDistance = result.docs
+            .map((doc: any) => {
+              const propLat = doc.location?.latitude
+              const propLng = doc.location?.longitude
+              if (!propLat || !propLng) return null
+
+              const distance = calculateDistance(lat, lng, propLat, propLng)
+              return { ...doc, distance: Math.round(distance) }
             })
-            return Response.json(result)
-          }
-
-          // Query with PostGIS distance calculation using sql template
-          const query = sql`
-            SELECT
-              p.*,
-              ST_X(p.location_coordinates::geometry) as coord_lng,
-              ST_Y(p.location_coordinates::geometry) as coord_lat,
-              ST_Distance(
-                p.location_coordinates::geography,
-                ST_SetSRID(ST_MakePoint(${lng}, ${lat}), 4326)::geography
-              ) as distance
-            FROM properties p
-            WHERE p.status = 'active'
-              AND ST_DWithin(
-                p.location_coordinates::geography,
-                ST_SetSRID(ST_MakePoint(${lng}, ${lat}), 4326)::geography,
-                ${radius}
-              )
-            ORDER BY distance ASC
-            LIMIT ${limit}
-          `
-
-          const result = await drizzle.execute(query)
-          const rows = result.rows || result
-
-          // Transform to Payload format
-          const docs = (rows as any[]).map((row: any) => ({
-            id: row.id,
-            name: row.name,
-            description: row.description,
-            pricePerMinute: row.price_per_minute,
-            type: row.type,
-            status: row.status,
-            location: {
-              address: row.location_address,
-              city: row.location_city,
-              state: row.location_state,
-              zipCode: row.location_zip_code,
-              coordinates: row.coord_lng && row.coord_lat ? [row.coord_lng, row.coord_lat] : null,
-            },
-            stats: {
-              averageRating: row.stats_average_rating,
-              reviewCount: row.stats_review_count,
-            },
-            distance: Math.round(row.distance),
-          }))
+            .filter((doc): doc is NonNullable<typeof doc> => doc !== null && doc.distance <= radius)
+            .sort((a, b) => a.distance - b.distance)
+            .slice(0, limit)
 
           return Response.json({
-            docs,
-            totalDocs: docs.length,
+            docs: docsWithDistance,
+            totalDocs: docsWithDistance.length,
             limit,
             totalPages: 1,
             page: 1,
@@ -227,8 +200,13 @@ export const Properties: CollectionConfig = {
           defaultValue: 'US',
         },
         {
-          name: 'coordinates',
-          type: 'point', // PostGIS point type
+          name: 'latitude',
+          type: 'number',
+          required: true,
+        },
+        {
+          name: 'longitude',
+          type: 'number',
           required: true,
         },
       ],

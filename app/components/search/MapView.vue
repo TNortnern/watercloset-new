@@ -8,7 +8,8 @@ interface Property {
     city?: string
     state?: string
     zipCode?: string
-    coordinates?: [number, number] // [lng, lat] from Payload point type
+    latitude?: number
+    longitude?: number
   }
 }
 
@@ -168,10 +169,10 @@ const updateMarkers = () => {
 
   // Add new markers
   props.properties.forEach(property => {
-    if (!property.location?.coordinates || !map.value) return
+    if (!property.location?.latitude || !property.location?.longitude || !map.value) return
 
-    // Payload point type stores as [lng, lat], Google Maps uses {lat, lng}
-    const [lng, lat] = property.location.coordinates
+    const lat = property.location.latitude
+    const lng = property.location.longitude
     const isSelected = property.id === props.selectedPropertyId
     const pricePerMinute = Number(property.pricePerMinute) || 0
     const priceLabel = `$${(pricePerMinute / 100).toFixed(2)}/min`

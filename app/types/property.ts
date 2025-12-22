@@ -14,8 +14,8 @@ export interface Property {
     zipCode?: string
   }
   location?: {
-    type: string
-    coordinates: [number, number] // [lng, lat] for MongoDB GeoJSON
+    latitude?: number
+    longitude?: number
   }
   amenities?: string[]
   propertyType?: string

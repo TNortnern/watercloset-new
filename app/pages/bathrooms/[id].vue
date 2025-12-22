@@ -65,7 +65,8 @@ interface Property {
     state: string
     zipCode: string
     country: string
-    coordinates: [number, number] | { type: 'Point', coordinates: [number, number] } | null // PostGIS point [lng, lat]
+    latitude?: number
+    longitude?: number
   }
   pricePerMinute: number // in cents
   minimumDuration: number
@@ -478,21 +479,10 @@ const durationOptions = computed(() => {
   return options
 })
 
-const propertyCoordinates = computed(() => {
-  const coords = property.value?.location?.coordinates
-  if (!coords) return null
-  if (Array.isArray(coords)) return coords
-  if (typeof coords === 'object' && Array.isArray(coords.coordinates)) {
-    return coords.coordinates
-  }
-  return null
-})
-
 const propertyLatLng = computed(() => {
-  if (!propertyCoordinates.value) return null
-  const [lng, lat] = propertyCoordinates.value
-  if (typeof lat !== 'number' || typeof lng !== 'number') return null
-  return { lat, lng }
+  const location = property.value?.location
+  if (!location?.latitude || !location?.longitude) return null
+  return { lat: location.latitude, lng: location.longitude }
 })
 
 // Google Maps URL

@@ -201,8 +201,6 @@ const submitForm = async () => {
       return
     }
 
-    const coordinates: [number, number] = [bestMatch.lng, bestMatch.lat]
-
     // Create property object (owner is set by beforeChange hook, status uses default 'pending')
     const propertyData = {
       name: formData.value.name,
@@ -214,7 +212,8 @@ const submitForm = async () => {
         state: formData.value.state,
         zipCode: formData.value.zipCode,
         country: 'US',
-        coordinates
+        latitude: bestMatch.lat,
+        longitude: bestMatch.lng,
       },
       pricePerMinute: Math.round(parseFloat(formData.value.pricePerMinute) * 100), // Convert to cents
       minimumDuration: parseInt(formData.value.minimumDuration),

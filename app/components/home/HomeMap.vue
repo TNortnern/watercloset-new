@@ -15,7 +15,8 @@ interface Property {
     city?: string
     state?: string
     zipCode?: string
-    coordinates?: [number, number] | { type: string; coordinates: number[] }
+    latitude?: number
+    longitude?: number
   }
   stats?: {
     averageRating?: number
@@ -58,29 +59,12 @@ let tooltipTimeout: NodeJS.Timeout | null = null
 const markers = computed<MapMarker[]>(() => {
   return props.properties
     .filter(p => {
-      const coords = p.location?.coordinates
-      if (!coords) return false
-      // Handle both [lng, lat] array and GeoJSON format
-      if (Array.isArray(coords)) return coords.length === 2
-      if (coords.type === 'Point' && coords.coordinates) return true
-      return false
+      const loc = p.location
+      return loc?.latitude != null && loc?.longitude != null
     })
     .map(p => {
-      const coords = p.location!.coordinates!
-      let lat: number, lng: number
-
-      if (Array.isArray(coords)) {
-        // PostGIS returns [lng, lat]
-        lng = coords[0]
-        lat = coords[1]
-      } else {
-        // GeoJSON format
-        lng = coords.coordinates[0]
-        lat = coords.coordinates[1]
-      }
-
       return {
-        position: { lat, lng },
+        position: { lat: p.location!.latitude!, lng: p.location!.longitude! },
         property: p,
       }
     })

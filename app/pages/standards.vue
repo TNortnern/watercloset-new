@@ -73,7 +73,7 @@ const prohibited = [
                </ul>
              </div>
              <div class="bg-slate-100 relative min-h-[300px]">
-                <img src="/images/bathrooms/bathroom.jpg" class="absolute inset-0 w-full h-full object-cover" alt="Clean Bathroom Standard" />
+                <img src="/images/bathrooms/bathroom1.jpg" class="absolute inset-0 w-full h-full object-cover" alt="Clean Bathroom Standard" />
              </div>
           </div>
         </div>

@@ -101,7 +101,7 @@ const providerBenefits = [
 
     <section class="py-20 px-6">
        <div class="container mx-auto max-w-4xl text-center bg-slate-900 rounded-[2.5rem] p-12 md:p-20 relative overflow-hidden">
-          <div class="absolute inset-0 bg-[url('/images/bathrooms/bathroom-blue.jpg')] opacity-10 bg-cover bg-center"></div>
+          <div class="absolute inset-0 bg-[url('/images/bathrooms/bathroom2.jpg')] opacity-10 bg-cover bg-center"></div>
           <div class="relative z-10 space-y-8">
             <h2 class="text-3xl md:text-5xl font-bold text-white">Custom Enterprise Solutions</h2>
             <p class="text-xl text-slate-300 max-w-2xl mx-auto">

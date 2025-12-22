@@ -84,8 +84,7 @@ cat > /app/ecosystem.config.json << EOF\n\
       "script": "/app/payload/server.js",\n\
       "cwd": "/app",\n\
       "env": {\n\
-        "NODE_ENV": "production",\n\
-        "PAYLOAD_FORCE_DRIZZLE_PUSH": "true",\n\
+        "NODE_ENV": "development",\n\
         "PORT": "${PAYLOAD_PORT}",\n\
         "HOSTNAME": "0.0.0.0",\n\
         "PAYLOAD_SECRET": "${PAYLOAD_SECRET}",\n\

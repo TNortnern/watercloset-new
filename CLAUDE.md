@@ -6,6 +6,10 @@
 - **Project**: watercloset-new
 - **Workspace**: Trayvon Northern (hobby account)
 - **Project URL**: https://railway.com/project/93d228b9-6978-4024-88b5-241769930463
+- **Live Frontend**: https://watercloset-new-production.up.railway.app
+
+**Note**: The Nuxt frontend and Payload API (apps/api) need separate deployments.
+The frontend proxies /api/* requests to the Payload API.
 
 ### Tech Stack
 - **Frontend**: Nuxt 4 (app/)

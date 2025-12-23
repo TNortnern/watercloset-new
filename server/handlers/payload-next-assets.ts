@@ -7,6 +7,11 @@ import { proxyRequest } from 'h3'
 export default defineEventHandler(async (event) => {
   const path = event.path || ''
 
+  // Only handle /_next requests
+  if (!path.startsWith('/_next')) {
+    return
+  }
+
   // In production, Payload runs on localhost:3000
   // In development, Payload runs on localhost:3001
   const payloadUrl = process.env.NODE_ENV === 'production'

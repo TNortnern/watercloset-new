@@ -90,6 +90,8 @@ export const Properties: CollectionConfig = {
     },
   ],
   access: {
+    // Only admins can access this collection in the admin panel
+    admin: ({ req: { user } }) => user?.role === 'admin',
     read: () => true, // Public can view active properties
     create: ({ req: { user } }) => user?.role === 'provider' || user?.role === 'admin',
     update: ({ req: { user } }) => {

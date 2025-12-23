@@ -29,6 +29,8 @@ export const Bookings: CollectionConfig = {
     defaultColumns: ['property', 'user', 'startTime', 'status', 'totalAmount'],
   },
   access: {
+    // Only admins can access this collection in the admin panel
+    admin: ({ req: { user } }) => user?.role === 'admin',
     read: ({ req: { user } }) => {
       if (!user) return false
       if (user.role === 'admin') return true

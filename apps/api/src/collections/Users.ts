@@ -13,6 +13,8 @@ export const Users: CollectionConfig = {
     group: 'Users',
   },
   access: {
+    // Only admins can access this collection in the admin panel
+    admin: ({ req: { user } }) => user?.role === 'admin',
     read: ({ req: { user } }) => {
       if (user?.role === 'admin') return true
       const publicRoles = [

@@ -17,6 +17,8 @@ export const Reviews: CollectionConfig = {
     defaultColumns: ['property', 'user', 'rating', 'createdAt'],
   },
   access: {
+    // Only admins can access this collection in the admin panel
+    admin: ({ req: { user } }) => user?.role === 'admin',
     read: () => true, // Public
     create: ({ req: { user } }) => !!user,
     update: ({ req: { user } }) => {

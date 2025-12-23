@@ -6,6 +6,8 @@ export const Media: CollectionConfig = {
     group: 'System',
   },
   access: {
+    // Only admins can access this collection in the admin panel
+    admin: ({ req: { user } }) => user?.role === 'admin',
     read: () => true,
     create: ({ req: { user } }) => !!user,
     update: ({ req: { user } }) => user?.role === 'admin',

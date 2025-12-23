@@ -1,8 +1,9 @@
 import type { CollectionConfig } from 'payload'
 import { createNotificationService } from '../services/notifications'
 
-const getRelationshipId = (value: unknown): number | string | null => {
-  if (typeof value === 'string' || typeof value === 'number') return value
+function getRelationshipId(value: unknown): number | string | null {
+  if (typeof value === 'string' || typeof value === 'number')
+    return value
   if (value && typeof value === 'object' && 'id' in value) {
     const id = (value as { id?: number | string }).id
     return typeof id === 'string' || typeof id === 'number' ? id : null
@@ -23,15 +24,17 @@ export const Reviews: CollectionConfig = {
     read: () => true, // Public
     create: ({ req: { user } }) => !!user,
     update: ({ req: { user } }) => {
-      if (!user) return false
-      if (user.role === 'admin') return true
+      if (!user)
+        return false
+      if (user.role === 'admin')
+        return true
       return { user: { equals: user.id } }
     },
     delete: ({ req: { user } }) => user?.role === 'admin',
   },
   hooks: {
     beforeValidate: [
-      async ({ req, data, operation, context }) => {
+      async ({ req, data, operation }) => {
         // Allow seeding with overrideAccess (when user and property are already set)
         if (operation === 'create' && data?.booking && data?.user && data?.property) {
           // If user and property are already set (seeding), skip validation
@@ -85,7 +88,8 @@ export const Reviews: CollectionConfig = {
         // Update property stats after review
         if (operation === 'create' || operation === 'update') {
           const propertyId = getRelationshipId(doc.property)
-          if (!propertyId) return
+          if (!propertyId)
+            return
 
           const reviews = await req.payload.find({
             collection: 'reviews',
@@ -114,7 +118,8 @@ export const Reviews: CollectionConfig = {
           // Update booking hasBeenReviewed field and send notification
           if (operation === 'create') {
             const bookingId = getRelationshipId(doc.booking)
-            if (!bookingId) return
+            if (!bookingId)
+              return
 
             await req.payload.update({
               collection: 'bookings',
@@ -144,9 +149,10 @@ export const Reviews: CollectionConfig = {
                 propertyId,
                 doc.rating,
                 doc.comment || '',
-                reviewerName
+                reviewerName,
               )
-            } catch (notifError) {
+            }
+            catch (notifError) {
               req.payload.logger.error(`Failed to send review notification: ${String(notifError)}`)
             }
           }

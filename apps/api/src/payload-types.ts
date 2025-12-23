@@ -73,6 +73,8 @@ export interface Config {
     reviews: Review;
     payouts: Payout;
     media: Media;
+    conversations: Conversation;
+    messages: Message;
     'payload-kv': PayloadKv;
     'payload-locked-documents': PayloadLockedDocument;
     'payload-preferences': PayloadPreference;
@@ -86,6 +88,8 @@ export interface Config {
     reviews: ReviewsSelect<false> | ReviewsSelect<true>;
     payouts: PayoutsSelect<false> | PayoutsSelect<true>;
     media: MediaSelect<false> | MediaSelect<true>;
+    conversations: ConversationsSelect<false> | ConversationsSelect<true>;
+    messages: MessagesSelect<false> | MessagesSelect<true>;
     'payload-kv': PayloadKvSelect<false> | PayloadKvSelect<true>;
     'payload-locked-documents': PayloadLockedDocumentsSelect<false> | PayloadLockedDocumentsSelect<true>;
     'payload-preferences': PayloadPreferencesSelect<false> | PayloadPreferencesSelect<true>;
@@ -405,6 +409,80 @@ export interface Payout {
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "conversations".
+ */
+export interface Conversation {
+  id: number;
+  /**
+   * The booking this conversation is about
+   */
+  booking: number | Booking;
+  /**
+   * The property being discussed
+   */
+  property: number | Property;
+  participants: {
+    user: number | User;
+    role: 'user' | 'provider';
+    /**
+     * When this participant last read the conversation
+     */
+    lastReadAt?: string | null;
+    muted?: boolean | null;
+    id?: string | null;
+  }[];
+  /**
+   * Preview of the last message
+   */
+  lastMessage?: {
+    content?: string | null;
+    sender?: (number | null) | User;
+    sentAt?: string | null;
+  };
+  /**
+   * Timestamp of the last message for sorting
+   */
+  lastMessageAt?: string | null;
+  messageCount?: number | null;
+  status?: ('active' | 'archived' | 'closed') | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "messages".
+ */
+export interface Message {
+  id: number;
+  conversation: number | Conversation;
+  sender: number | User;
+  content: string;
+  messageType?: ('text' | 'system' | 'image' | 'file') | null;
+  attachments?:
+    | {
+        file?: (number | null) | Media;
+        fileName?: string | null;
+        id?: string | null;
+      }[]
+    | null;
+  isEdited?: boolean | null;
+  editedAt?: string | null;
+  /**
+   * Soft delete - message content hidden but record preserved
+   */
+  isDeleted?: boolean | null;
+  readBy?:
+    | {
+        user?: (number | null) | User;
+        readAt?: string | null;
+        id?: string | null;
+      }[]
+    | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "payload-kv".
  */
 export interface PayloadKv {
@@ -450,6 +528,14 @@ export interface PayloadLockedDocument {
     | ({
         relationTo: 'media';
         value: number | Media;
+      } | null)
+    | ({
+        relationTo: 'conversations';
+        value: number | Conversation;
+      } | null)
+    | ({
+        relationTo: 'messages';
+        value: number | Message;
       } | null);
   globalSlug?: string | null;
   user: {
@@ -718,6 +804,64 @@ export interface MediaSelect<T extends boolean = true> {
               filename?: T;
             };
       };
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "conversations_select".
+ */
+export interface ConversationsSelect<T extends boolean = true> {
+  booking?: T;
+  property?: T;
+  participants?:
+    | T
+    | {
+        user?: T;
+        role?: T;
+        lastReadAt?: T;
+        muted?: T;
+        id?: T;
+      };
+  lastMessage?:
+    | T
+    | {
+        content?: T;
+        sender?: T;
+        sentAt?: T;
+      };
+  lastMessageAt?: T;
+  messageCount?: T;
+  status?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "messages_select".
+ */
+export interface MessagesSelect<T extends boolean = true> {
+  conversation?: T;
+  sender?: T;
+  content?: T;
+  messageType?: T;
+  attachments?:
+    | T
+    | {
+        file?: T;
+        fileName?: T;
+        id?: T;
+      };
+  isEdited?: T;
+  editedAt?: T;
+  isDeleted?: T;
+  readBy?:
+    | T
+    | {
+        user?: T;
+        readAt?: T;
+        id?: T;
+      };
+  updatedAt?: T;
+  createdAt?: T;
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema

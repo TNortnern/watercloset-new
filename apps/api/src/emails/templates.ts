@@ -82,7 +82,7 @@ function formatCurrency(cents: number): string {
 
 // Email Templates
 
-export function bookingConfirmationEmail(booking: BookingDetails, user: UserDetails): { subject: string; html: string; text: string } {
+export function bookingConfirmationEmail(booking: BookingDetails, user: UserDetails): { subject: string, html: string, text: string } {
   const subject = `Booking Confirmed - ${booking.propertyName}`
 
   const html = wrapTemplate(`
@@ -159,7 +159,7 @@ MyWaterCloset - Find restrooms when you need them
   return { subject, html, text }
 }
 
-export function newBookingProviderEmail(booking: BookingDetails, user: UserDetails, provider: ProviderDetails): { subject: string; html: string; text: string } {
+export function newBookingProviderEmail(booking: BookingDetails, user: UserDetails, provider: ProviderDetails): { subject: string, html: string, text: string } {
   const subject = `New Booking - ${booking.propertyName}`
 
   const html = wrapTemplate(`
@@ -228,14 +228,14 @@ MyWaterCloset Provider Dashboard
   return { subject, html, text }
 }
 
-export function bookingCancelledEmail(booking: BookingDetails, user: UserDetails, cancelledBy: 'user' | 'provider' | 'admin'): { subject: string; html: string; text: string } {
+export function bookingCancelledEmail(booking: BookingDetails, user: UserDetails, cancelledBy: 'user' | 'provider' | 'admin'): { subject: string, html: string, text: string } {
   const subject = `Booking Cancelled - ${booking.propertyName}`
 
   const cancelReasonText = cancelledBy === 'user'
     ? 'You cancelled this booking.'
     : cancelledBy === 'provider'
-    ? 'The property owner cancelled this booking.'
-    : 'This booking was cancelled by the administrator.'
+      ? 'The property owner cancelled this booking.'
+      : 'This booking was cancelled by the administrator.'
 
   const html = wrapTemplate(`
     <div class="header" style="background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);">
@@ -290,7 +290,7 @@ MyWaterCloset - Find restrooms when you need them
   return { subject, html, text }
 }
 
-export function bookingCompletedEmail(booking: BookingDetails, user: UserDetails): { subject: string; html: string; text: string } {
+export function bookingCompletedEmail(booking: BookingDetails, user: UserDetails): { subject: string, html: string, text: string } {
   const subject = `Thanks for using ${booking.propertyName}!`
 
   const html = wrapTemplate(`
@@ -354,8 +354,8 @@ export function newReviewNotificationEmail(
   rating: number,
   comment: string,
   reviewerName: string,
-  provider: ProviderDetails
-): { subject: string; html: string; text: string } {
+  provider: ProviderDetails,
+): { subject: string, html: string, text: string } {
   const subject = `New ${rating}-Star Review for ${propertyName}`
 
   const stars = '★'.repeat(rating) + '☆'.repeat(5 - rating)
@@ -415,8 +415,8 @@ export function payoutNotificationEmail(
   status: 'pending' | 'processing' | 'completed' | 'failed',
   provider: ProviderDetails,
   periodStart: string | Date,
-  periodEnd: string | Date
-): { subject: string; html: string; text: string } {
+  periodEnd: string | Date,
+): { subject: string, html: string, text: string } {
   const statusColors = {
     pending: '#f59e0b',
     processing: '#3b82f6',
@@ -480,6 +480,54 @@ Status: ${status.toUpperCase()}
 Payouts typically arrive within 2-3 business days after processing.
 
 MyWaterCloset Provider Dashboard
+`
+
+  return { subject, html, text }
+}
+
+export function newMessageNotificationEmail(
+  recipientName: string,
+  senderName: string,
+  messagePreview: string,
+  propertyName: string,
+  conversationId: number | string,
+): { subject: string, html: string, text: string } {
+  const subject = `New message from ${senderName} about ${propertyName}`
+
+  const html = wrapTemplate(`
+    <div class="header" style="background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%);">
+      <h1>New Message</h1>
+    </div>
+    <div class="content">
+      <p>Hi ${recipientName},</p>
+      <p><strong>${senderName}</strong> sent you a message about <strong>${propertyName}</strong>:</p>
+
+      <blockquote style="border-left: 4px solid #8b5cf6; margin: 20px 0; padding: 15px 20px; background: #f9fafb; font-style: italic; border-radius: 0 8px 8px 0;">
+        "${messagePreview}${messagePreview.length >= 200 ? '...' : ''}"
+      </blockquote>
+
+      <p style="text-align: center;">
+        <a href="${process.env.FRONTEND_URL || 'https://watercloset-new-production.up.railway.app'}/dashboard/messages?conversation=${conversationId}" class="button" style="background: #8b5cf6;">View Conversation</a>
+      </p>
+    </div>
+    <div class="footer">
+      <p>MyWaterCloset - Find restrooms when you need them</p>
+      <p style="font-size: 11px; color: #9ca3af;">You can manage your notification preferences in your account settings.</p>
+    </div>
+  `)
+
+  const text = `
+New Message from ${senderName}
+
+Hi ${recipientName},
+
+${senderName} sent you a message about ${propertyName}:
+
+"${messagePreview}${messagePreview.length >= 200 ? '...' : ''}"
+
+View the conversation at: ${process.env.FRONTEND_URL || 'https://watercloset-new-production.up.railway.app'}/dashboard/messages?conversation=${conversationId}
+
+MyWaterCloset - Find restrooms when you need them
 `
 
   return { subject, html, text }

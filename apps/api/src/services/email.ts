@@ -15,14 +15,14 @@ interface BrevoPayload {
     name: string
     email: string
   }
-  to: Array<{ email: string; name?: string }>
+  to: Array<{ email: string, name?: string }>
   subject: string
   htmlContent: string
   textContent?: string
   replyTo?: { email: string }
 }
 
-export async function sendEmail(options: EmailOptions): Promise<{ success: boolean; error?: string; messageId?: string }> {
+export async function sendEmail(options: EmailOptions): Promise<{ success: boolean, error?: string, messageId?: string }> {
   const apiKey = process.env.BREVO_API_KEY
 
   if (!apiKey) {
@@ -73,13 +73,14 @@ export async function sendEmail(options: EmailOptions): Promise<{ success: boole
     const data = await response.json()
     console.log('[Email] Sent successfully:', data.messageId, 'to:', toAddresses.join(', '))
     return { success: true, messageId: data.messageId }
-  } catch (err) {
+  }
+  catch (err) {
     console.error('[Email] Error sending email:', err)
     return { success: false, error: String(err) }
   }
 }
 
-export async function sendBatchEmails(emails: EmailOptions[]): Promise<{ success: boolean; results: Array<{ success: boolean; error?: string }> }> {
+export async function sendBatchEmails(emails: EmailOptions[]): Promise<{ success: boolean, results: Array<{ success: boolean, error?: string }> }> {
   const results = await Promise.all(emails.map(sendEmail))
   return {
     success: results.every(r => r.success),

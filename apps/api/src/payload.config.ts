@@ -1,23 +1,25 @@
-import { buildConfig } from 'payload'
+import path from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { postgresAdapter } from '@payloadcms/db-postgres'
 import { lexicalEditor } from '@payloadcms/richtext-lexical'
-import path from 'path'
-import { fileURLToPath } from 'url'
+import { buildConfig } from 'payload'
 import sharp from 'sharp'
 
+import { Bookings } from './collections/Bookings'
+import { Conversations } from './collections/Conversations'
+import { Media } from './collections/Media'
+import { Messages } from './collections/Messages'
+import { Payouts } from './collections/Payouts'
+import { Properties } from './collections/Properties'
+import { Reviews } from './collections/Reviews'
 // Collections
 import { Users } from './collections/Users'
-import { Properties } from './collections/Properties'
-import { Bookings } from './collections/Bookings'
-import { Reviews } from './collections/Reviews'
-import { Payouts } from './collections/Payouts'
-import { Media } from './collections/Media'
-
-// Migrations
-import { migrations } from './migrations'
 
 // Custom Endpoints
 import { stripeEndpoints } from './endpoints/stripe'
+
+// Migrations
+import { migrations } from './migrations'
 
 const filename = fileURLToPath(import.meta.url)
 const dirname = path.dirname(filename)
@@ -56,6 +58,8 @@ export default buildConfig({
     Reviews,
     Payouts,
     Media,
+    Conversations,
+    Messages,
   ],
 
   endpoints: stripeEndpoints,

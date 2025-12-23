@@ -4,7 +4,7 @@ import { createNotificationService } from '../services/notifications'
 
 // Lazy Stripe initialization to ensure env vars are loaded
 let stripeInstance: Stripe | null = null
-const getStripe = () => {
+function getStripe() {
   if (!stripeInstance) {
     stripeInstance = new Stripe(process.env.STRIPE_SECRET_KEY || '', {
       apiVersion: '2025-02-24.acacia',
@@ -13,8 +13,9 @@ const getStripe = () => {
   return stripeInstance
 }
 
-const getRelationshipId = (value: unknown): number | string | null => {
-  if (typeof value === 'string' || typeof value === 'number') return value
+function getRelationshipId(value: unknown): number | string | null {
+  if (typeof value === 'string' || typeof value === 'number')
+    return value
   if (value && typeof value === 'object' && 'id' in value) {
     const id = (value as { id?: number | string }).id
     return typeof id === 'string' || typeof id === 'number' ? id : null
@@ -33,8 +34,10 @@ export const Bookings: CollectionConfig = {
     // Only admins can access this collection in the admin panel
     admin: ({ req: { user } }) => user?.role === 'admin',
     read: ({ req: { user } }) => {
-      if (!user) return false
-      if (user.role === 'admin') return true
+      if (!user)
+        return false
+      if (user.role === 'admin')
+        return true
       if (user.role === 'provider') {
         // Providers can see bookings for their properties
         return {
@@ -46,8 +49,10 @@ export const Bookings: CollectionConfig = {
     },
     create: ({ req: { user } }) => !!user,
     update: ({ req: { user } }) => {
-      if (!user) return false
-      if (user.role === 'admin') return true
+      if (!user)
+        return false
+      if (user.role === 'admin')
+        return true
       return false // Updates happen via hooks/endpoints
     },
     delete: ({ req: { user } }) => user?.role === 'admin',
@@ -69,7 +74,7 @@ export const Bookings: CollectionConfig = {
 
           if (property) {
             const durationMinutes = Math.ceil(
-              (new Date(data.endTime).getTime() - new Date(data.startTime).getTime()) / 60000
+              (new Date(data.endTime).getTime() - new Date(data.startTime).getTime()) / 60000,
             )
             data.duration = durationMinutes
             data.totalAmount = property.pricePerMinute * durationMinutes
@@ -88,7 +93,8 @@ export const Bookings: CollectionConfig = {
           // Create Stripe Payment Intent
           try {
             const propertyId = getRelationshipId(doc.property)
-            if (!propertyId) return
+            if (!propertyId)
+              return
             const property = await req.payload.findByID({
               collection: 'properties',
               id: propertyId,
@@ -96,7 +102,8 @@ export const Bookings: CollectionConfig = {
             })
 
             const ownerId = getRelationshipId(property?.owner)
-            if (!ownerId) return
+            if (!ownerId)
+              return
             const owner = await req.payload.findByID({
               collection: 'users',
               id: ownerId,
@@ -125,7 +132,8 @@ export const Bookings: CollectionConfig = {
                 },
               })
             }
-          } catch (error) {
+          }
+          catch (error) {
             req.payload.logger.error(`Stripe payment intent creation failed: ${String(error)}`)
           }
         }
@@ -140,10 +148,56 @@ export const Bookings: CollectionConfig = {
               notificationService.sendBookingConfirmation(doc),
               notificationService.sendNewBookingToProvider(doc),
             ])
-          } else if (doc.status === 'completed') {
+
+            // Auto-create conversation for booking
+            try {
+              const propertyId = getRelationshipId(doc.property)
+              const userId = getRelationshipId(doc.user)
+
+              if (propertyId && userId) {
+                const property = await req.payload.findByID({
+                  collection: 'properties',
+                  id: propertyId,
+                  depth: 1,
+                })
+
+                const ownerId = getRelationshipId(property?.owner)
+                if (ownerId && ownerId !== userId) {
+                  // Check if conversation already exists for this booking
+                  const existingConversation = await req.payload.find({
+                    collection: 'conversations',
+                    where: { booking: { equals: doc.id } },
+                    limit: 1,
+                  })
+
+                  if (existingConversation.totalDocs === 0) {
+                    // Create conversation with user and provider as participants
+                    await req.payload.create({
+                      collection: 'conversations',
+                      data: {
+                        booking: doc.id,
+                        property: propertyId as number,
+                        participants: [
+                          { user: userId as number, role: 'user' },
+                          { user: ownerId as number, role: 'provider' },
+                        ],
+                        status: 'active',
+                      },
+                    })
+                    req.payload.logger.info(`Created conversation for booking ${doc.id}`)
+                  }
+                }
+              }
+            }
+            catch (convError) {
+              req.payload.logger.error(`Failed to create conversation: ${String(convError)}`)
+            }
+          }
+          else if (doc.status === 'completed') {
             // Send completion email with review request
             await notificationService.sendBookingCompleted(doc)
-          } else if (doc.status === 'cancelled') {
+          }
+          else if (doc.status === 'cancelled') {
             // Determine who cancelled (check if cancellation.cancelledBy exists)
             const cancelledById = getRelationshipId(doc.cancellation?.cancelledBy)
             const userId = getRelationshipId(doc.user)
@@ -152,7 +206,8 @@ export const Bookings: CollectionConfig = {
             if (cancelledById) {
               if (cancelledById === userId) {
                 cancelledBy = 'user'
-              } else {
+              }
+              else {
                 // Check if cancelled by property owner
                 const propertyId = getRelationshipId(doc.property)
                 if (propertyId) {
@@ -171,7 +226,8 @@ export const Bookings: CollectionConfig = {
 
             await notificationService.sendBookingCancelled(doc, cancelledBy)
           }
-        } catch (notifError) {
+        }
+        catch (notifError) {
           // Don't fail the booking operation if notifications fail
           req.payload.logger.error(`Failed to send booking notification: ${String(notifError)}`)
         }
@@ -276,14 +332,14 @@ export const Bookings: CollectionConfig = {
       type: 'text',
       admin: {
         readOnly: true,
-        condition: (data) => data?.status === 'confirmed',
+        condition: data => data?.status === 'confirmed',
       },
     },
     {
       name: 'accessInstructions',
       type: 'textarea',
       admin: {
-        condition: (data) => data?.status === 'confirmed',
+        condition: data => data?.status === 'confirmed',
       },
     },
     // Cancellation
@@ -291,7 +347,7 @@ export const Bookings: CollectionConfig = {
       name: 'cancellation',
       type: 'group',
       admin: {
-        condition: (data) => data?.status === 'cancelled' || data?.status === 'refunded',
+        condition: data => data?.status === 'cancelled' || data?.status === 'refunded',
       },
       fields: [
         {

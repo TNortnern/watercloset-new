@@ -16,19 +16,23 @@ export const Users: CollectionConfig = {
     // Only admins can access this collection in the admin panel
     admin: ({ req: { user } }) => user?.role === 'admin',
     read: ({ req: { user } }) => {
-      if (user?.role === 'admin') return true
+      if (user?.role === 'admin')
+        return true
       const publicRoles = [
         { role: { equals: 'provider' } },
         { role: { equals: 'admin' } },
       ]
-      if (!user) return { or: publicRoles }
+      if (!user)
+        return { or: publicRoles }
       return { or: [{ id: { equals: user.id } }, ...publicRoles] }
     },
     create: () => true, // Anyone can register
     update: ({ req: { user }, id }) => {
       // Users can update their own record, admins can update anyone
-      if (!user) return false
-      if (user.role === 'admin') return true
+      if (!user)
+        return false
+      if (user.role === 'admin')
+        return true
       return user.id === id || user.id === Number(id)
     },
     delete: ({ req: { user } }) => user?.role === 'admin',
@@ -85,7 +89,7 @@ export const Users: CollectionConfig = {
       name: 'providerInfo',
       type: 'group',
       admin: {
-        condition: (data) => data?.role === 'provider',
+        condition: data => data?.role === 'provider',
       },
       fields: [
         {

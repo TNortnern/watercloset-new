@@ -1,9 +1,9 @@
-import 'dotenv/config'
-import fs from 'fs'
-import path from 'path'
-import { fileURLToPath } from 'url'
-import { getPayload } from 'payload'
+import fs from 'node:fs'
+import path from 'node:path'
+import { fileURLToPath } from 'node:url'
 import config from '@payload-config'
+import { getPayload } from 'payload'
+import 'dotenv/config'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
@@ -79,39 +79,71 @@ const propertyTemplates = [
 
 const propertyTypes = ['residential', 'commercial', 'restaurant', 'hotel'] as const
 const amenitiesOptions = [
-  'wheelchair', 'baby_changing', 'shower', 'bidet', 'air_freshener',
-  'hand_dryer', 'paper_towels', 'feminine', 'mirror', 'climate', 'private', 'gender_neutral'
+  'wheelchair',
+  'baby_changing',
+  'shower',
+  'bidet',
+  'air_freshener',
+  'hand_dryer',
+  'paper_towels',
+  'feminine',
+  'mirror',
+  'climate',
+  'private',
+  'gender_neutral',
 ] as const
 
 type Amenity = typeof amenitiesOptions[number]
 
 const businessNames = [
-  'CleanStop', 'Fresh Facilities', 'Urban Oasis', 'City Restroom', 'Quick Relief',
-  'Comfort Station', 'Pristine Place', 'The Powder Room', 'Rest Easy', 'Nature\'s Call',
-  'Clean Break', 'Fresh Start', 'Downtown Facilities', 'Metro Restroom', 'City Clean',
+  'CleanStop',
+  'Fresh Facilities',
+  'Urban Oasis',
+  'City Restroom',
+  'Quick Relief',
+  'Comfort Station',
+  'Pristine Place',
+  'The Powder Room',
+  'Rest Easy',
+  'Nature\'s Call',
+  'Clean Break',
+  'Fresh Start',
+  'Downtown Facilities',
+  'Metro Restroom',
+  'City Clean',
 ]
 
 const residentialNames = [
-  'Cozy Home Restroom', 'Private Home Bathroom', 'Guest Bathroom', 'Family Home',
-  'Apartment Bath', 'Townhouse Facilities', 'Condo Restroom', 'Loft Bathroom'
+  'Cozy Home Restroom',
+  'Private Home Bathroom',
+  'Guest Bathroom',
+  'Family Home',
+  'Apartment Bath',
+  'Townhouse Facilities',
+  'Condo Restroom',
+  'Loft Bathroom',
 ]
 
-const getMimeType = (filename: string) => {
+function getMimeType(filename: string) {
   const ext = path.extname(filename).toLowerCase()
-  if (ext === '.png') return 'image/png'
-  if (ext === '.webp') return 'image/webp'
-  if (ext === '.jpeg' || ext === '.jpg') return 'image/jpeg'
+  if (ext === '.png')
+    return 'image/png'
+  if (ext === '.webp')
+    return 'image/webp'
+  if (ext === '.jpeg' || ext === '.jpg')
+    return 'image/jpeg'
   return 'application/octet-stream'
 }
 
-const loadSeedImages = () => {
-  if (!fs.existsSync(bathroomImagesDir)) return []
+function loadSeedImages() {
+  if (!fs.existsSync(bathroomImagesDir))
+    return []
   return fs.readdirSync(bathroomImagesDir)
-    .filter(file => /\.(jpg|jpeg|png|webp)$/i.test(file))
+    .filter(file => /\.(?:jpg|jpeg|png|webp)$/i.test(file))
     .map(file => path.join(bathroomImagesDir, file))
 }
 
-const ensureSeedMedia = async (payload: any) => {
+async function ensureSeedMedia(payload: any) {
   const imagePaths = loadSeedImages()
   const mediaIds: number[] = []
 
@@ -149,7 +181,8 @@ const ensureSeedMedia = async (payload: any) => {
         },
       })
       mediaIds.push(media.id)
-    } catch (error) {
+    }
+    catch (error) {
       console.error(`Error seeding media for ${filename}:`, error)
     }
   }
@@ -158,20 +191,20 @@ const ensureSeedMedia = async (payload: any) => {
 }
 
 // Helper to get random elements from array
-const getRandomElements = <T>(arr: readonly T[], count: number): T[] => {
+function getRandomElements<T>(arr: readonly T[], count: number): T[] {
   const shuffled = [...arr].sort(() => 0.5 - Math.random())
   return shuffled.slice(0, count)
 }
 
 // Helper to add small random offset to coordinates
-const offsetCoords = (lat: number, lng: number): { latitude: number; longitude: number } => {
+function offsetCoords(lat: number, lng: number): { latitude: number, longitude: number } {
   const latOffset = (Math.random() - 0.5) * 0.02 // ~1km offset
   const lngOffset = (Math.random() - 0.5) * 0.02
   return { latitude: lat + latOffset, longitude: lng + lngOffset }
 }
 
 // Generate description for rich text
-const generateDescription = (type: string, area: string) => {
+function generateDescription(type: string, area: string) {
   const descriptions: Record<string, string[]> = {
     residential: [
       `Clean and well-maintained private bathroom in ${area}. Perfect for those in need while exploring the neighborhood.`,
@@ -198,7 +231,7 @@ const generateDescription = (type: string, area: string) => {
   return options[Math.floor(Math.random() * options.length)]
 }
 
-const seed = async () => {
+async function seed() {
   const payload = await getPayload({ config })
 
   console.log('Seeding test users...')
@@ -222,7 +255,8 @@ const seed = async () => {
         },
       })
       console.log('Created super admin: foodeater563@gmail.com')
-    } else {
+    }
+    else {
       // Update role to admin if not already
       if (existingAdmin.docs[0].role !== 'admin') {
         await payload.update({
@@ -231,11 +265,13 @@ const seed = async () => {
           data: { role: 'admin' },
         })
         console.log('Updated foodeater563@gmail.com to admin role')
-      } else {
+      }
+      else {
         console.log('foodeater563@gmail.com already exists as admin')
       }
     }
-  } catch (error) {
+  }
+  catch (error) {
     console.error('Error creating super admin:', error)
   }
 
@@ -263,10 +299,12 @@ const seed = async () => {
         },
       })
       console.log('Created test provider: testprovider@gmail.com')
-    } else {
+    }
+    else {
       console.log('testprovider@gmail.com already exists')
     }
-  } catch (error) {
+  }
+  catch (error) {
     console.error('Error creating test provider:', error)
   }
 
@@ -296,11 +334,13 @@ const seed = async () => {
       })
       providerId = provider.id
       console.log('Created provider@provider.provider')
-    } else {
+    }
+    else {
       providerId = existingProvider.docs[0].id
       console.log('provider@provider.provider already exists')
     }
-  } catch (error) {
+  }
+  catch (error) {
     console.error('Error creating provider:', error)
   }
 
@@ -332,10 +372,12 @@ const seed = async () => {
         })
         providerIds.push(provider.id)
         console.log(`Created ${email}`)
-      } else {
+      }
+      else {
         providerIds.push(existing.docs[0].id)
       }
-    } catch (error) {
+    }
+    catch (error) {
       console.error(`Error creating provider ${i}:`, error)
     }
   }
@@ -359,10 +401,12 @@ const seed = async () => {
         },
       })
       console.log('Created enjoyer@enjoyer.enjoyer')
-    } else {
+    }
+    else {
       console.log('enjoyer@enjoyer.enjoyer already exists')
     }
-  } catch (error) {
+  }
+  catch (error) {
     console.error('Error creating enjoyer:', error)
   }
 
@@ -474,7 +518,8 @@ const seed = async () => {
         })
         createdCount++
         process.stdout.write(`\rCreated ${createdCount} properties...`)
-      } catch (error) {
+      }
+      catch (error) {
         console.error(`\nError creating property:`, error)
       }
     }
@@ -600,7 +645,8 @@ const seed = async () => {
         reviewsCreated++
 
         process.stdout.write(`\rCreated ${bookingsCreated} bookings, ${reviewsCreated} reviews...`)
-      } catch (error) {
+      }
+      catch {
         // Silently skip errors (e.g., duplicate reviews)
       }
     }

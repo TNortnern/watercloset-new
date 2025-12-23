@@ -1,16 +1,15 @@
-import type { CollectionConfig } from 'payload'
-import type { PayloadRequest } from 'payload'
+import type { CollectionConfig, PayloadRequest } from 'payload'
 
 // Haversine formula to calculate distance between two points
 function calculateDistance(lat1: number, lon1: number, lat2: number, lon2: number): number {
   const R = 6371000 // Earth's radius in meters
   const dLat = (lat2 - lat1) * Math.PI / 180
   const dLon = (lon2 - lon1) * Math.PI / 180
-  const a =
-    Math.sin(dLat/2) * Math.sin(dLat/2) +
-    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
-    Math.sin(dLon/2) * Math.sin(dLon/2)
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a))
+  const a
+    = Math.sin(dLat / 2) * Math.sin(dLat / 2)
+      + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180)
+      * Math.sin(dLon / 2) * Math.sin(dLon / 2)
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
   return R * c // Distance in meters
 }
 
@@ -27,15 +26,15 @@ export const Properties: CollectionConfig = {
       method: 'get',
       handler: async (req: PayloadRequest) => {
         const url = new URL(req.url || '', 'http://localhost')
-        const lat = parseFloat(url.searchParams.get('lat') || url.searchParams.get('latitude') || '0')
-        const lng = parseFloat(url.searchParams.get('lng') || url.searchParams.get('longitude') || '0')
-        const radius = parseFloat(url.searchParams.get('radius') || '5000') // meters
-        const limit = parseInt(url.searchParams.get('limit') || '20')
+        const lat = Number.parseFloat(url.searchParams.get('lat') || url.searchParams.get('latitude') || '0')
+        const lng = Number.parseFloat(url.searchParams.get('lng') || url.searchParams.get('longitude') || '0')
+        const radius = Number.parseFloat(url.searchParams.get('radius') || '5000') // meters
+        const limit = Number.parseInt(url.searchParams.get('limit') || '20')
 
         if (!lat || !lng) {
           return Response.json(
             { error: 'lat and lng are required' },
-            { status: 400 }
+            { status: 400 },
           )
         }
 
@@ -55,7 +54,8 @@ export const Properties: CollectionConfig = {
             .map((doc: any) => {
               const propLat = doc.location?.latitude
               const propLng = doc.location?.longitude
-              if (!propLat || !propLng) return null
+              if (!propLat || !propLng)
+                return null
 
               const distance = calculateDistance(lat, lng, propLat, propLng)
               return { ...doc, distance: Math.round(distance) }
@@ -73,7 +73,8 @@ export const Properties: CollectionConfig = {
             hasNextPage: false,
             hasPrevPage: false,
           })
-        } catch (error) {
+        }
+        catch (error) {
           console.error('Nearby search error:', error)
           // Fallback to standard find
           const result = await req.payload.find({
@@ -95,8 +96,10 @@ export const Properties: CollectionConfig = {
     read: () => true, // Public can view active properties
     create: ({ req: { user } }) => user?.role === 'provider' || user?.role === 'admin',
     update: ({ req: { user } }) => {
-      if (!user) return false
-      if (user.role === 'admin') return true
+      if (!user)
+        return false
+      if (user.role === 'admin')
+        return true
       if (user.role === 'provider') {
         return { owner: { equals: user.id } }
       }
@@ -149,8 +152,10 @@ export const Properties: CollectionConfig = {
       access: {
         // Admins can set any status, providers can only toggle active/inactive
         update: ({ req: { user }, data, siblingData }) => {
-          if (!user) return false
-          if (user.role === 'admin') return true
+          if (!user)
+            return false
+          if (user.role === 'admin')
+            return true
           // Providers can only switch between active and inactive
           if (user.role === 'provider') {
             const newStatus = data?.status || siblingData?.status

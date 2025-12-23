@@ -3,7 +3,7 @@ import Stripe from 'stripe'
 
 // Lazy Stripe initialization
 let stripeInstance: Stripe | null = null
-const getStripe = () => {
+function getStripe() {
   if (!stripeInstance) {
     stripeInstance = new Stripe(process.env.STRIPE_SECRET_KEY || '', {
       apiVersion: '2025-02-24.acacia',
@@ -12,8 +12,9 @@ const getStripe = () => {
   return stripeInstance
 }
 
-const getRelationshipId = (value: unknown): number | string | null => {
-  if (typeof value === 'string' || typeof value === 'number') return value
+function getRelationshipId(value: unknown): number | string | null {
+  if (typeof value === 'string' || typeof value === 'number')
+    return value
   if (value && typeof value === 'object' && 'id' in value) {
     const id = (value as { id?: number | string }).id
     return typeof id === 'string' || typeof id === 'number' ? id : null
@@ -80,7 +81,8 @@ export const createPaymentIntent: Endpoint = {
       if (booking.stripePaymentIntentId) {
         // Retrieve existing PaymentIntent
         paymentIntent = await stripe.paymentIntents.retrieve(booking.stripePaymentIntentId)
-      } else {
+      }
+      else {
         // Create new PaymentIntent
         const paymentIntentData: Stripe.PaymentIntentCreateParams = {
           amount: booking.totalAmount || 0,
@@ -116,7 +118,8 @@ export const createPaymentIntent: Endpoint = {
         amount: paymentIntent.amount,
         status: paymentIntent.status,
       })
-    } catch (error) {
+    }
+    catch (error) {
       payload.logger.error(`Error creating payment intent: ${String(error)}`)
       return Response.json({ error: 'Failed to create payment intent' }, { status: 500 })
     }
@@ -183,7 +186,8 @@ export const createConnectOnboardingLink: Endpoint = {
       })
 
       return Response.json({ url: accountLink.url })
-    } catch (error) {
+    }
+    catch (error) {
       payload.logger.error(`Error creating Connect onboarding link: ${String(error)}`)
       return Response.json({ error: 'Failed to create onboarding link' }, { status: 500 })
     }
@@ -237,7 +241,8 @@ export const getConnectAccountStatus: Endpoint = {
         payoutsEnabled: account.payouts_enabled,
         detailsSubmitted: account.details_submitted,
       })
-    } catch (error) {
+    }
+    catch (error) {
       payload.logger.error(`Error getting Connect account status: ${String(error)}`)
       return Response.json({ error: 'Failed to get account status' }, { status: 500 })
     }
@@ -269,7 +274,8 @@ export const createConnectLoginLink: Endpoint = {
       const loginLink = await stripe.accounts.createLoginLink(accountId)
 
       return Response.json({ url: loginLink.url })
-    } catch (error) {
+    }
+    catch (error) {
       payload.logger.error(`Error creating Connect login link: ${String(error)}`)
       return Response.json({ error: 'Failed to create login link' }, { status: 500 })
     }
@@ -302,12 +308,14 @@ export const stripeWebhook: Endpoint = {
 
       if (webhookSecret) {
         event = stripe.webhooks.constructEvent(rawBody, signature, webhookSecret)
-      } else {
+      }
+      else {
         // For testing without signature verification
         event = JSON.parse(rawBody) as Stripe.Event
         payload.logger.warn('Webhook signature verification disabled')
       }
-    } catch (err: any) {
+    }
+    catch (err: any) {
       payload.logger.error(`Webhook signature verification failed: ${String(err?.message || err)}`)
       return Response.json({ error: 'Invalid signature' }, { status: 400 })
     }
@@ -378,7 +386,8 @@ export const stripeWebhook: Endpoint = {
       }
 
       return Response.json({ received: true })
-    } catch (error) {
+    }
+    catch (error) {
       payload.logger.error(`Error processing webhook: ${String(error)}`)
       return Response.json({ error: 'Webhook handler failed' }, { status: 500 })
     }

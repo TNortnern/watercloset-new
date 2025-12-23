@@ -1,4 +1,5 @@
-import { MigrateUpArgs, MigrateDownArgs, sql } from '@payloadcms/db-postgres'
+import type { MigrateDownArgs, MigrateUpArgs } from '@payloadcms/db-postgres'
+import { sql } from '@payloadcms/db-postgres'
 
 export async function up({ db, payload, req }: MigrateUpArgs): Promise<void> {
   // Drop all existing objects to ensure clean slate
@@ -40,7 +41,7 @@ export async function up({ db, payload, req }: MigrateUpArgs): Promise<void> {
     DROP TYPE IF EXISTS "public"."enum_properties_type" CASCADE;
     DROP TYPE IF EXISTS "public"."enum_bookings_status" CASCADE;
     DROP TYPE IF EXISTS "public"."enum_payouts_status" CASCADE;
-  `);
+  `)
 
   await db.execute(sql`
    CREATE TYPE "public"."enum_users_role" AS ENUM('user', 'provider', 'admin');

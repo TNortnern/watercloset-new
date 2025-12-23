@@ -1,31 +1,14 @@
 import type { Payload } from 'payload'
-import { sendEmail } from './email'
 import {
-  bookingConfirmationEmail,
-  newBookingProviderEmail,
   bookingCancelledEmail,
   bookingCompletedEmail,
+  bookingConfirmationEmail,
+  newBookingProviderEmail,
+  newMessageNotificationEmail,
   newReviewNotificationEmail,
   payoutNotificationEmail,
 } from '../emails/templates'
-
-// Helper to safely get relationship data
-function getRelationshipData<T>(value: unknown): T | null {
-  if (!value) return null
-  if (typeof value === 'object' && 'id' in value) {
-    return value as T
-  }
-  return null
-}
-
-function getRelationshipId(value: unknown): number | string | null {
-  if (typeof value === 'string' || typeof value === 'number') return value
-  if (value && typeof value === 'object' && 'id' in value) {
-    const id = (value as { id?: number | string }).id
-    return typeof id === 'string' || typeof id === 'number' ? id : null
-  }
-  return null
-}
+import { sendEmail } from './email'
 
 interface User {
   id: number | string
@@ -85,7 +68,8 @@ export class NotificationService {
         id: userOrId as number,
       })
       return user as unknown as User
-    } catch (err) {
+    }
+    catch (err) {
       console.error('[Notifications] Failed to fetch user:', err)
       return null
     }
@@ -103,7 +87,8 @@ export class NotificationService {
         depth: 1,
       })
       return property as unknown as Property
-    } catch (err) {
+    }
+    catch (err) {
       console.error('[Notifications] Failed to fetch property:', err)
       return null
     }
@@ -116,7 +101,8 @@ export class NotificationService {
 
   // Format property address
   private formatAddress(property: Property): string {
-    if (!property.location) return 'Address not available'
+    if (!property.location)
+      return 'Address not available'
     const { address, city, state } = property.location
     return [address, city, state].filter(Boolean).join(', ')
   }
@@ -317,7 +303,7 @@ export class NotificationService {
     propertyId: number | string,
     rating: number,
     comment: string,
-    reviewerName: string
+    reviewerName: string,
   ): Promise<void> {
     const property = await this.getProperty(propertyId)
     if (!property) {
@@ -343,7 +329,7 @@ export class NotificationService {
       rating,
       comment,
       reviewerName,
-      providerDetails
+      providerDetails,
     )
 
     await sendEmail({
@@ -360,7 +346,7 @@ export class NotificationService {
     amount: number,
     status: 'pending' | 'processing' | 'completed' | 'failed',
     periodStart: string | Date,
-    periodEnd: string | Date
+    periodEnd: string | Date,
   ): Promise<void> {
     const provider = await this.getUser(providerId)
     if (!provider) {
@@ -378,6 +364,31 @@ export class NotificationService {
     const email = payoutNotificationEmail(amount, status, providerDetails, periodStart, periodEnd)
     await sendEmail({
       to: provider.email,
+      subject: email.subject,
+      html: email.html,
+      text: email.text,
+    })
+  }
+
+  // Send message notification email
+  async sendMessageNotification(
+    recipientEmail: string,
+    recipientName: string,
+    senderName: string,
+    messagePreview: string,
+    propertyName: string,
+    conversationId: number | string,
+  ): Promise<void> {
+    const email = newMessageNotificationEmail(
+      recipientName,
+      senderName,
+      messagePreview,
+      propertyName,
+      conversationId,
+    )
+
+    await sendEmail({
+      to: recipientEmail,
       subject: email.subject,
       html: email.html,
       text: email.text,

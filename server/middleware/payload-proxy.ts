@@ -6,7 +6,8 @@ export default defineEventHandler(async (event) => {
   // Proxy these paths to Payload CMS backend
   // /admin is the Payload admin panel
   // /media and /_payload are Payload internal routes
-  const proxyPaths = ['/admin', '/media', '/_payload']
+  // /_next is needed for Payload's Next.js static assets
+  const proxyPaths = ['/admin', '/media', '/_payload', '/_next']
 
   // Check if this path should be proxied to Payload
   const shouldProxy = proxyPaths.some(prefix => path.startsWith(prefix))

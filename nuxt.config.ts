@@ -100,14 +100,6 @@ export default defineNuxtConfig({
       routes: ['/'],
       ignore: ['/hi', '/admin', '/api'],
     },
-    // Add handler for /_next/* requests - must be registered at Nitro level
-    // because _next paths are treated specially by Nuxt's router
-    handlers: [
-      {
-        route: '/_next/**',
-        handler: '~/server/handlers/payload-next-assets.ts',
-      },
-    ],
   },
 
   eslint: {

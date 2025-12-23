@@ -1,4 +1,5 @@
 import type { CollectionConfig } from 'payload'
+import { createNotificationService } from '../services/notifications'
 
 const getRelationshipId = (value: unknown): number | string | null => {
   if (typeof value === 'string' || typeof value === 'number') return value
@@ -110,7 +111,7 @@ export const Reviews: CollectionConfig = {
             },
           })
 
-          // Update booking hasBeenReviewed field
+          // Update booking hasBeenReviewed field and send notification
           if (operation === 'create') {
             const bookingId = getRelationshipId(doc.booking)
             if (!bookingId) return
@@ -122,6 +123,32 @@ export const Reviews: CollectionConfig = {
                 hasBeenReviewed: true,
               },
             })
+
+            // Send notification to provider about new review
+            try {
+              const notificationService = createNotificationService(req.payload)
+              const userId = getRelationshipId(doc.user)
+              let reviewerName = 'A customer'
+
+              if (userId) {
+                const user = await req.payload.findByID({
+                  collection: 'users',
+                  id: userId,
+                })
+                if (user) {
+                  reviewerName = `${user.firstName} ${user.lastName}`
+                }
+              }
+
+              await notificationService.sendNewReviewNotification(
+                propertyId,
+                doc.rating,
+                doc.comment || '',
+                reviewerName
+              )
+            } catch (notifError) {
+              req.payload.logger.error(`Failed to send review notification: ${String(notifError)}`)
+            }
           }
         }
       },

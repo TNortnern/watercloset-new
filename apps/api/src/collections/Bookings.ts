@@ -1,5 +1,6 @@
 import type { CollectionConfig } from 'payload'
 import Stripe from 'stripe'
+import { createNotificationService } from '../services/notifications'
 
 // Lazy Stripe initialization to ensure env vars are loaded
 let stripeInstance: Stripe | null = null
@@ -129,10 +130,50 @@ export const Bookings: CollectionConfig = {
           }
         }
 
-        // Send notifications
-        if (doc.status === 'confirmed') {
-          // TODO: Send confirmation email to user
-          // TODO: Send notification to provider
+        // Send notifications based on status
+        const notificationService = createNotificationService(req.payload)
+
+        try {
+          if (doc.status === 'confirmed') {
+            // Send confirmation to user and notification to provider
+            await Promise.all([
+              notificationService.sendBookingConfirmation(doc),
+              notificationService.sendNewBookingToProvider(doc),
+            ])
+          } else if (doc.status === 'completed') {
+            // Send completion email with review request
+            await notificationService.sendBookingCompleted(doc)
+          } else if (doc.status === 'cancelled') {
+            // Determine who cancelled (check if cancellation.cancelledBy exists)
+            const cancelledById = getRelationshipId(doc.cancellation?.cancelledBy)
+            const userId = getRelationshipId(doc.user)
+            let cancelledBy: 'user' | 'provider' | 'admin' = 'admin'
+
+            if (cancelledById) {
+              if (cancelledById === userId) {
+                cancelledBy = 'user'
+              } else {
+                // Check if cancelled by property owner
+                const propertyId = getRelationshipId(doc.property)
+                if (propertyId) {
+                  const property = await req.payload.findByID({
+                    collection: 'properties',
+                    id: propertyId,
+                    depth: 0,
+                  })
+                  const ownerId = getRelationshipId(property?.owner)
+                  if (ownerId === cancelledById) {
+                    cancelledBy = 'provider'
+                  }
+                }
+              }
+            }
+
+            await notificationService.sendBookingCancelled(doc, cancelledBy)
+          }
+        } catch (notifError) {
+          // Don't fail the booking operation if notifications fail
+          req.payload.logger.error(`Failed to send booking notification: ${String(notifError)}`)
         }
       },
     ],

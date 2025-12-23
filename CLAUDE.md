@@ -53,3 +53,33 @@ pnpm dev:web  # Nuxt app on port 3000
 
 - `provider@provider.provider` / `provider123` - Provider user
 - `testprovider@gmail.com` / `Test1234!` - Test provider
+
+## rb-payload / BookFlow Integration
+
+WaterCloset is registered as an app in rb-payload's multi-tenant booking engine.
+
+### Credentials
+- **App ID**: 5
+- **App Slug**: mywatercloset
+- **API Key Prefix**: `mwc_`
+- **Master API Key**: `mwc_6oCSws9ZQvhK5tULEkCSg7qo3cqorTtB`
+- **API Base URL**: https://reusablebook-payload-production.up.railway.app
+- **Documentation**: https://reusablebook-payload-production.up.railway.app/docs/marketplace
+
+### Environment Variables (add to .env)
+```
+RB_PAYLOAD_URL=https://reusablebook-payload-production.up.railway.app
+RB_PAYLOAD_API_KEY=mwc_6oCSws9ZQvhK5tULEkCSg7qo3cqorTtB
+```
+
+### Key Endpoints
+- `POST /api/provision/tenant` - Create tenant for a new rental business
+- `GET /api/services` - List services (rental items)
+- `GET /api/availability/month` - Check monthly availability
+- `POST /api/bookings` - Create a booking
+
+### Integration Pattern
+1. Each WaterCloset provider becomes an rb-payload "tenant"
+2. Provider properties become "services" (with inventory mode)
+3. Configure webhooks to sync booking events back to WaterCloset
+4. Use the embeddable booking widget OR build custom UI with the API

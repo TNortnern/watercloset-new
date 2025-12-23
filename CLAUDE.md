@@ -12,6 +12,8 @@
 - Payload runs internally on port 3000
 - Nuxt is exposed on Railway's PORT (public)
 - Nuxt proxies /api/* to localhost:3000 (internal Payload)
+- Payload CMS admin panel is at `/admin`
+- Nuxt platform dashboard is at `/platform` (moved from /admin to avoid conflict)
 
 ### Tech Stack
 - **Frontend**: Nuxt 4 (app/)

@@ -146,11 +146,11 @@ const handleLogout = async () => {
 
               <NuxtLink
                 v-if="isAdmin"
-                to="/admin"
+                to="/platform"
                 @click="showUserMenu = false"
                 class="block px-4 py-2 text-sm text-slate-700 hover:bg-slate-50"
               >
-                Admin Panel
+                Platform Admin
               </NuxtLink>
 
               <div class="border-t border-slate-100 mt-1 pt-1">

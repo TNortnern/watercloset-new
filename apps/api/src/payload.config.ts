@@ -13,6 +13,9 @@ import { Reviews } from './collections/Reviews'
 import { Payouts } from './collections/Payouts'
 import { Media } from './collections/Media'
 
+// Migrations
+import { migrations } from './migrations'
+
 // Custom Endpoints
 import { stripeEndpoints } from './endpoints/stripe'
 
@@ -40,8 +43,10 @@ export default buildConfig({
     pool: {
       connectionString: process.env.DATABASE_URL || 'postgres://postgres:postgres@localhost:5432/watercloset',
     },
-    // Force schema push in production for initial deployment
-    push: process.env.PAYLOAD_FORCE_DRIZZLE_PUSH === 'true' || process.env.NODE_ENV !== 'production',
+    // Use migrations in production, push in development
+    push: process.env.NODE_ENV !== 'production',
+    // Run migrations in production
+    prodMigrations: migrations,
   }),
 
   collections: [

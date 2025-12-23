@@ -78,16 +78,16 @@ const user = computed(() => ({
   avatar: authUser.value?.avatar?.url
 }))
 
-// Admin dashboard navigation
+// Platform admin dashboard navigation
 const navigationItems = [
-  { name: 'Dashboard', href: '/admin', icon: LayoutDashboard },
-  { name: 'Users', href: '/admin/users', icon: Users, badge: 12 },
-  { name: 'Properties', href: '/admin/properties', icon: Building2, badge: 5 },
-  { name: 'Bookings', href: '/admin/bookings', icon: Calendar },
-  { name: 'Provider Requests', href: '/admin/provider-requests', icon: Shield, badge: 8 },
-  { name: 'Refund Requests', href: '/admin/refund-requests', icon: CreditCard, badge: 3 },
-  { name: 'Analytics', href: '/admin/analytics', icon: BarChart3 },
-  { name: 'Settings', href: '/admin/settings', icon: Settings },
+  { name: 'Dashboard', href: '/platform', icon: LayoutDashboard },
+  { name: 'Users', href: '/platform/users', icon: Users, badge: 12 },
+  { name: 'Properties', href: '/platform/properties', icon: Building2, badge: 5 },
+  { name: 'Bookings', href: '/platform/bookings', icon: Calendar },
+  { name: 'Provider Requests', href: '/platform/provider-requests', icon: Shield, badge: 8 },
+  { name: 'Refund Requests', href: '/platform/refund-requests', icon: CreditCard, badge: 3 },
+  { name: 'Analytics', href: '/platform/analytics', icon: BarChart3 },
+  { name: 'Settings', href: '/platform/settings', icon: Settings },
 ]
 
 // Mobile navigation shows only main items

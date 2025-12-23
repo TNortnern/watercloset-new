@@ -3,7 +3,7 @@
     <!-- Header with Back Button -->
     <div class="flex items-center justify-between">
       <div class="flex items-center space-x-4">
-        <NuxtLink to="/admin/users" class="p-2 hover:bg-gray-100 rounded-lg transition-colors">
+        <NuxtLink to="/platform/users" class="p-2 hover:bg-gray-100 rounded-lg transition-colors">
           <ArrowLeft class="w-5 h-5 text-gray-600" />
         </NuxtLink>
         <div>
@@ -113,7 +113,7 @@
         <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
           <div class="flex items-center justify-between mb-4">
             <h3 class="text-lg font-semibold text-gray-900">Recent Bookings</h3>
-            <button @click="navigateTo('/admin/bookings')" class="text-sm text-blue-600 hover:text-blue-700 font-medium">View All</button>
+            <button @click="navigateTo('/platform/bookings')" class="text-sm text-blue-600 hover:text-blue-700 font-medium">View All</button>
           </div>
           <div class="overflow-x-auto">
             <table class="min-w-full divide-y divide-gray-200">

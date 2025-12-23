@@ -211,12 +211,12 @@ import { Button } from '@/components/ui/button'
 // Define custom navigation for admin
 const adminNavigation = [
   { name: 'Dashboard', href: '/admin', icon: LayoutDashboard },
-  { name: 'Users', href: '/admin/users', icon: Users },
-  { name: 'Providers', href: '/admin/providers', icon: Building2, badge: 5 },
-  { name: 'Bookings', href: '/admin/bookings', icon: Calendar },
-  { name: 'Refunds', href: '/admin/refunds', icon: DollarSign, badge: 3 },
-  { name: 'Reports', href: '/admin/reports', icon: FileText, badge: 12 },
-  { name: 'Settings', href: '/admin/settings', icon: Settings },
+  { name: 'Users', href: '/platform/users', icon: Users },
+  { name: 'Providers', href: '/platform/providers', icon: Building2, badge: 5 },
+  { name: 'Bookings', href: '/platform/bookings', icon: Calendar },
+  { name: 'Refunds', href: '/platform/refunds', icon: DollarSign, badge: 3 },
+  { name: 'Reports', href: '/platform/reports', icon: FileText, badge: 12 },
+  { name: 'Settings', href: '/platform/settings', icon: Settings },
 ]
 
 definePageMeta({

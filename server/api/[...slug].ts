@@ -4,9 +4,13 @@
  */
 export default defineEventHandler(async (event) => {
   const path = event.path.replace(/^\/api/, '')
-  const payloadUrl = process.env.PAYLOAD_PUBLIC_SERVER_URL || 'http://localhost:3001'
+  // In production, Payload runs internally on localhost:3000
+  // PAYLOAD_PUBLIC_SERVER_URL is the public URL, not internal
+  const payloadInternalUrl = process.env.NODE_ENV === 'production'
+    ? 'http://localhost:3000'
+    : 'http://localhost:3001'
 
-  const url = `${payloadUrl}/api${path}`
+  const url = `${payloadInternalUrl}/api${path}`
   const method = event.method
   const contentType = event.headers.get('content-type') || ''
 

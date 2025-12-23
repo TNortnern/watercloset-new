@@ -11,7 +11,7 @@
     <!-- Error State -->
     <div v-else-if="error" class="bg-red-50 border border-red-200 rounded-lg p-6 text-center">
       <p class="text-red-600 mb-4">{{ error }}</p>
-      <NuxtLink to="/admin/properties" class="text-blue-600 hover:underline">Back to Properties</NuxtLink>
+      <NuxtLink to="/platform/properties" class="text-blue-600 hover:underline">Back to Properties</NuxtLink>
     </div>
 
     <!-- Main Content -->
@@ -19,7 +19,7 @@
       <!-- Header with Back Button -->
       <div class="flex items-center justify-between">
         <div class="flex items-center space-x-4">
-          <NuxtLink to="/admin/properties" class="p-2 hover:bg-gray-100 rounded-lg transition-colors">
+          <NuxtLink to="/platform/properties" class="p-2 hover:bg-gray-100 rounded-lg transition-colors">
             <ArrowLeft class="w-5 h-5 text-gray-600" />
           </NuxtLink>
           <div>
@@ -177,7 +177,7 @@
                 <span class="text-gray-900">{{ formatDate(owner.createdAt) }}</span>
               </div>
             </div>
-            <NuxtLink :to="`/admin/users/${owner.id}`" class="mt-4 block w-full text-center px-4 py-2 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-lg transition-colors text-sm font-medium">
+            <NuxtLink :to="`/platform/users/${owner.id}`" class="mt-4 block w-full text-center px-4 py-2 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-lg transition-colors text-sm font-medium">
               View Owner Profile
             </NuxtLink>
           </div>
@@ -207,7 +207,7 @@
           <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
             <div class="flex items-center justify-between mb-4">
               <h3 class="text-lg font-semibold text-gray-900">Booking History</h3>
-              <NuxtLink to="/admin/bookings" class="text-sm text-blue-600 hover:text-blue-700 font-medium">View All</NuxtLink>
+              <NuxtLink to="/platform/bookings" class="text-sm text-blue-600 hover:text-blue-700 font-medium">View All</NuxtLink>
             </div>
             <div v-if="bookings.length > 0" class="overflow-x-auto">
               <table class="min-w-full divide-y divide-gray-200">
@@ -560,7 +560,7 @@ async function deleteProperty() {
   try {
     await payload.remove('properties', propertyId)
     toast.success('Property deleted')
-    router.push('/admin/properties')
+    router.push('/platform/properties')
   } catch (e) {
     console.error('Failed to delete property:', e)
     toast.error('Failed to delete property')

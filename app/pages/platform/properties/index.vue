@@ -128,7 +128,7 @@
               </td>
               <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                 <div class="flex items-center justify-end space-x-2">
-                  <NuxtLink :to="`/admin/properties/${property.id}`" class="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors" title="View Details">
+                  <NuxtLink :to="`/platform/properties/${property.id}`" class="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors" title="View Details">
                     <Eye class="w-4 h-4" />
                   </NuxtLink>
                   <button

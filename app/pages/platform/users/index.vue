@@ -140,7 +140,7 @@
               </td>
               <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                 <div class="flex items-center justify-end space-x-2">
-                  <NuxtLink :to="`/admin/users/${user.id}`" class="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors" title="View Details">
+                  <NuxtLink :to="`/platform/users/${user.id}`" class="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors" title="View Details">
                     <Eye class="w-4 h-4" />
                   </NuxtLink>
                   <button @click="editUser(user.id)" class="p-2 text-gray-600 hover:bg-gray-50 rounded-lg transition-colors" title="Edit User">
@@ -298,7 +298,7 @@ async function changeUserRole(userId: string, newRole: string) {
 }
 
 const editUser = (userId: string) => {
-  navigateTo(`/admin/users/${userId}`)
+  navigateTo(`/platform/users/${userId}`)
 }
 
 const toggleUserStatus = (userId: string) => {

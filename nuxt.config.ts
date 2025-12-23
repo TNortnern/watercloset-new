@@ -13,12 +13,23 @@ export default defineNuxtConfig({
     },
   },
 
-  // API routes are now handled by server/api/* files instead of proxy
-  // routeRules: {
-  //   '/api/**': {
-  //     proxy: { to: 'http://localhost:3001/api/**' },
-  //   },
-  // },
+  // Proxy Payload CMS routes - routeRules handle routing at Nitro level
+  // PAYLOAD_INTERNAL_URL should be http://localhost:3000 in production (same container)
+  // or http://localhost:3001 in development (separate process)
+  routeRules: {
+    '/admin/**': {
+      proxy: { to: `${process.env.PAYLOAD_INTERNAL_URL || 'http://localhost:3001'}/admin/**` },
+    },
+    '/_next/**': {
+      proxy: { to: `${process.env.PAYLOAD_INTERNAL_URL || 'http://localhost:3001'}/_next/**` },
+    },
+    '/_payload/**': {
+      proxy: { to: `${process.env.PAYLOAD_INTERNAL_URL || 'http://localhost:3001'}/_payload/**` },
+    },
+    '/media/**': {
+      proxy: { to: `${process.env.PAYLOAD_INTERNAL_URL || 'http://localhost:3001'}/media/**` },
+    },
+  },
 
   modules: [
     '@nuxtjs/tailwindcss',
